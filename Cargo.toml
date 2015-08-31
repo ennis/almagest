@@ -1,0 +1,22 @@
+[package]
+name = "almagest"
+version = "0.1.0"
+authors = ["Alexandre Bléron <alex.bleron@gmail.com>"]
+
+[dependencies]
+nalgebra = "*"
+libc = "*"
+log = "0.3.1"
+fern = "0.3.5"
+time = "*"
+num = "*"
+image = "*"
+typed-arena = "*"
+smallvec="*"
+
+[dependencies.glfw]
+git = "https://github.com/bjz/glfw-rs.git"
+default-features = false
+
+[dependencies.gl]
+git = "https://github.com/bjz/gl-rs"
