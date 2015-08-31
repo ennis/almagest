@@ -306,9 +306,9 @@ pub fn sample_scene()
 				// put a scope here to end borrow of 'frame' before handing it to ctx
 				{
 					// allocate temp buffer for shader parameters
-					let param_buf = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
+					//let param_buf = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
 					// allocate another for the lulz
-					let param_buf_2 = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
+					//let param_buf_2 = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
 					let param_buf_3 = frame.make_uniform_buffer(&shader_params);
 
 
@@ -338,7 +338,7 @@ pub fn sample_scene()
 							&[buffer::Binding{ slot: 0, slice: cube_mesh.vb.raw.as_raw_buf_slice()}], 
 							Some(cube_mesh.ib.as_ref().unwrap().raw.as_raw_buf_slice()));
 						
-						//rq.add_render_item(mat_block, vertex_block_3, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
+						rq.add_render_item(mat_block, vertex_block_3, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
 						rq.add_render_item(mat_block, vertex_block_2, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
 						//rq.add_render_item(mat_block, vertex_block, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_2.as_raw()}));
 						rq.execute(&frame, None);

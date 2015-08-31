@@ -18,12 +18,12 @@ pub fn as_byte_slice<T>(slice: &[T]) -> &[u8] {
 /// Treat a given object as `&[u8]` for the given function call
 pub fn object_as_byte_slice<T>(obj: &T) -> &[u8] {
     let len = mem::size_of::<T>();
-    let slice = raw::Slice { data: &obj, len: len };
+    let slice = raw::Slice { data: obj, len: len };
     unsafe { mem::transmute(slice) }
 }
 
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum BufferAccess
 {
 	ReadOnly,
@@ -54,6 +54,7 @@ pub struct Binding<'a>
 	pub slice: RawBufSlice<'a>
 }
 
+#[derive(Debug)]
 pub struct RawBuffer<'a>
 {
 	context: &'a BufferAllocator,
@@ -99,7 +100,7 @@ pub struct Buffer<'a, T>
 	_r: PhantomData<T>
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct RawBufSlice<'a>
 {
 	pub raw: &'a RawBuffer<'a>,
@@ -108,7 +109,7 @@ pub struct RawBufSlice<'a>
 }
 
 // buffer slices
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct BufSlice<'a, T>
 {
 	pub raw: &'a RawBuffer<'a>,
@@ -143,6 +144,7 @@ impl<'a, T> BufSlice<'a, T>
 	}
 }
 
+#[derive(Debug)]
 pub struct BufferAllocator;
 
 

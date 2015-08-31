@@ -45,7 +45,8 @@ impl<'a> Frame<'a>
 			BufferAccess::WriteOnly, 
 			binding, 
 			BufferUsage::Stream,
-			initial_data.map(|d| as_byte_slice(d)));
+			if let Some(d) = initial_data { Some(as_byte_slice(d)) } else { None });
+			//initial_data.map(|d| as_byte_slice(d)));
 		unsafe {
 			self.temporary_buffers.alloc(buf).as_buf_slice(0, num_elements)
 		}
@@ -55,6 +56,7 @@ impl<'a> Frame<'a>
 		&'b self, 
 		initial_data: &T) -> BufSlice<'b, T>
 	{
+		trace!("sizeof<t>: {}", mem::size_of::<T>());	
 		let buf = self.buffer_allocator.alloc_raw_buffer(
 			mem::size_of::<T>(), 
 			BufferAccess::WriteOnly, 
