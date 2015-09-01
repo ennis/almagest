@@ -41,11 +41,43 @@ impl TrackballCameraSettings
 			sensitivity: 0.1
 		}
 	}
+	
+	pub fn with_eye_center(self, initial_eye: &Pnt3<f32>) -> Self
+	{
+		TrackballCameraSettings {
+			initial_eye: *initial_eye,
+			.. self
+		}
+	}
+	
+	pub fn with_field_of_view(self, fov: f64) -> Self
+	{
+		TrackballCameraSettings {
+			field_of_view: fov,
+			.. self
+		}
+	}
 
 	pub fn with_near_plane(self, near_plane: f64) -> Self 
 	{
 		TrackballCameraSettings {
 			near_plane: near_plane,
+			.. self
+		}
+	}
+	
+	pub fn with_far_plane(self, far_plane: f64) -> Self
+	{
+		TrackballCameraSettings {
+			far_plane: far_plane,
+			.. self
+		}
+	}
+	
+	pub fn with_sensitivity(self, sensitivity: f64) -> Self 
+	{
+		TrackballCameraSettings {
+			sensitivity: sensitivity,
 			.. self
 		}
 	}

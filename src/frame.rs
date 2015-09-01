@@ -93,7 +93,7 @@ impl<'a> Frame<'a>
 		// TODO non-random arena size
 		let fbo = match render_target.output {
 			RenderTargetOutput::Screen => 0,
-			RenderTargetOutput::Texture { color_targets: ref color_targets } => create_framebuffer(&color_targets[..])
+			RenderTargetOutput::Texture { ref color_targets } => create_framebuffer(&color_targets[..])
 		};
 		Frame {
 			buffer_allocator: buffer_allocator,
