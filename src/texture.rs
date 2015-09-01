@@ -192,7 +192,7 @@ impl TextureFormat
 
 pub struct Texture2D
 {
-	obj: GLuint,
+	pub obj: GLuint,
 	width: u32,
 	height: u32,
 	format: TextureFormat
@@ -263,4 +263,8 @@ impl Texture2D
 			gl::BindTextures(unit, 1, &self.obj);
 		}
 	}
+	
+	pub fn width(&self) -> u32 { self.width }
+	pub fn height(&self) -> u32 { self.height }
+	pub fn dimensions(&self) -> (u32,  u32) { (self.width, self.height) }
 }

@@ -9,14 +9,81 @@ use std::cell::RefCell;
 use attrib::*;
 use shader::{Program};
 use draw::*;
-use render_target::*;
 use texture::Texture2D;
+
+
+pub struct RenderTarget<'a>
+{
+	viewport: (i32, i32, i32, i32),
+	output: RenderTargetOutput<'a>
+}
+
+pub enum RenderTargetOutput<'a>
+{
+	Screen,
+	Texture { color_targets: Vec<&'a mut Texture2D> }
+}
+
+impl<'a> RenderTarget<'a>
+{
+	pub fn screen(screen_size: (i32, i32)) -> RenderTarget<'a>
+	{
+		RenderTarget {
+			viewport: (0, 0, screen_size.0, screen_size.1),
+			output: RenderTargetOutput::Screen
+		}
+	}
+	
+	pub fn render_to_texture( color_targets: Vec<&'a mut Texture2D> ) -> RenderTarget<'a> 
+	{
+		// TODO check that all color & depth targets have the same size
+		RenderTarget {
+			viewport: (0, 0, color_targets[0].width() as i32, color_targets[0].height() as i32),
+			output: RenderTargetOutput::Texture { color_targets: color_targets }
+		}	
+	} 
+}
 
 pub struct Frame<'a> 
 {
 	buffer_allocator: &'a BufferAllocator,
 	temporary_buffers: Arena<RawBuffer<'a>>,
-	render_target: RenderTarget<'a>
+	render_target: RenderTarget<'a>,
+	framebuffer: GLuint
+}
+
+fn create_framebuffer(color_targets: &[&mut Texture2D]) -> GLuint
+{
+	let mut fbo : GLuint = 0;
+	unsafe {
+		gl::GenFramebuffers(1, &mut fbo);
+		gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+		
+		// bind color attachements
+		for (i, tex) in color_targets.iter().enumerate() {
+			// TODO support targets other than 2d textures
+			// (texture layers, cube map faces, whole cube map, etc.)
+			gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0 + i as u32, tex.obj, 0);
+		}
+		
+		// no depth texture
+		let draw_buffers = [
+			gl::COLOR_ATTACHMENT0,
+			gl::COLOR_ATTACHMENT0 + 1,
+			gl::COLOR_ATTACHMENT0 + 2,
+			gl::COLOR_ATTACHMENT0 + 3,
+			gl::COLOR_ATTACHMENT0 + 4,
+			gl::COLOR_ATTACHMENT0 + 5,
+			gl::COLOR_ATTACHMENT0 + 6,
+			gl::COLOR_ATTACHMENT0 + 7
+		];
+		
+		gl::DrawBuffers(color_targets.len() as GLsizei, draw_buffers[..].as_ptr());
+		
+		assert!(gl::CheckFramebufferStatus(gl::FRAMEBUFFER) == gl::FRAMEBUFFER_COMPLETE);
+	}
+	
+	fbo
 }
 
 impl<'a> Frame<'a>
@@ -24,10 +91,15 @@ impl<'a> Frame<'a>
 	pub fn new(buffer_allocator: &'a BufferAllocator, render_target: RenderTarget<'a>) -> Frame<'a>
 	{
 		// TODO non-random arena size
+		let fbo = match render_target.output {
+			RenderTargetOutput::Screen => 0,
+			RenderTargetOutput::Texture { color_targets: ref color_targets } => create_framebuffer(&color_targets[..])
+		};
 		Frame {
 			buffer_allocator: buffer_allocator,
 			temporary_buffers: Arena::with_capacity(300),
-			render_target: render_target
+			render_target: render_target,
+			framebuffer: fbo
 		}
 	}
 
@@ -56,7 +128,6 @@ impl<'a> Frame<'a>
 		&'b self, 
 		initial_data: &T) -> BufSlice<'b, T>
 	{
-		trace!("sizeof<t>: {}", mem::size_of::<T>());	
 		let buf = self.buffer_allocator.alloc_raw_buffer(
 			mem::size_of::<T>(), 
 			BufferAccess::WriteOnly, 

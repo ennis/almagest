@@ -1,11 +1,11 @@
 use buffer::{Buffer, BufferAccess, BufferBindingHint, BufferUsage, BufferAllocator};
 use shader::{Shader, Program, ShaderStage, ShaderPipelineDesc};
-use frame::{Frame};
+use frame::{Frame, RenderTarget};
 use gl::types::*;
 use gl;
 use libc::c_void;
 use std::ffi::CStr;
-use render_target::RenderTarget;
+
 
 pub struct Context
 {

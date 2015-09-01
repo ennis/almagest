@@ -1,11 +1,11 @@
 
 use frame;
+use frame::*;
 use buffer;
 use context;
 use shader;
 use attrib;
 use draw;
-use render_target;
 use render_queue;
 use texture;
 use glutil;
@@ -264,7 +264,7 @@ pub fn sample_scene()
 	let img = image::open(&Path::new("test.jpg")).unwrap();
 	let (w, h) = img.dimensions();
 	let img2 = img.as_rgb8().unwrap();
-	let tex = texture::Texture2D::new(w, h, 1, texture::TextureFormat::Unorm8x3, Some(img2));
+	let mut tex = texture::Texture2D::new(w, h, 1, texture::TextureFormat::Unorm8x3, Some(img2));
 
 	unsafe {
 		let mut sampler : GLuint = 0;
@@ -275,7 +275,7 @@ pub fn sample_scene()
 		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
 		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
 		gl::BindSampler(0, sampler);
-		tex.bind(0);
+		//tex.bind(0);
 	}
 
 	let mut camera_controller = TrackballCameraSettings::default().build();
@@ -301,51 +301,56 @@ pub fn sample_scene()
 					gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
 			    }
 
-				let frame = ctx.create_frame(render_target::RenderTarget::Screen);
-
-				// put a scope here to end borrow of 'frame' before handing it to ctx
 				{
-					// allocate temp buffer for shader parameters
-					//let param_buf = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
-					// allocate another for the lulz
-					//let param_buf_2 = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
-					let param_buf_3 = frame.make_uniform_buffer(&shader_params);
-
-
-					// render queue test
-					let mut rq = render_queue::RenderQueue::new();
+					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
+					let frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
+					
+					// put a scope here to end borrow of 'frame' before handing it to ctx
 					{
-						let mesh_part = draw::MeshPart { 
-							primitive_type: draw::PrimitiveType::Triangle,
-							start_vertex: 0,
-							start_index: 0,
-							num_vertices: mesh2.num_vertices as u32,
-							num_indices: mesh2.num_indices as u32 };
-
-						let mat_block = rq.create_material_block(&prog, &[]);
-						let mat_block_2 = rq.create_material_block(&prog, &[]);
-
-						let vertex_block = rq.create_vertex_input_block(
-							&layout,
-							&[buffer::Binding{ slot: 0, slice: mesh2.vb.raw.as_raw_buf_slice()}], None);
-						let vertex_block_2 = rq.create_vertex_input_block(
-							&layout,
-							&[buffer::Binding{ slot: 0, slice: mesh2.vb.raw.as_raw_buf_slice()}], 
-							if let Some(ref ib) = mesh2.ib { Some(ib.raw.as_raw_buf_slice()) } else { None });
-
-						let vertex_block_3 = rq.create_vertex_input_block(
-							&layout,
-							&[buffer::Binding{ slot: 0, slice: cube_mesh.vb.raw.as_raw_buf_slice()}], 
-							Some(cube_mesh.ib.as_ref().unwrap().raw.as_raw_buf_slice()));
-						
-						rq.add_render_item(mat_block, vertex_block_3, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
-						rq.add_render_item(mat_block, vertex_block_2, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
-						//rq.add_render_item(mat_block, vertex_block, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_2.as_raw()}));
-						rq.execute(&frame, None);
+						// allocate temp buffer for shader parameters
+						//let param_buf = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
+						// allocate another for the lulz
+						//let param_buf_2 = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
+						let param_buf_3 = frame.make_uniform_buffer(&shader_params);
+	
+	
+						// render queue test
+						let mut rq = render_queue::RenderQueue::new();
+						{
+							let mesh_part = draw::MeshPart { 
+								primitive_type: draw::PrimitiveType::Triangle,
+								start_vertex: 0,
+								start_index: 0,
+								num_vertices: mesh2.num_vertices as u32,
+								num_indices: mesh2.num_indices as u32 };
+	
+							let mat_block = rq.create_material_block(&prog, &[]);
+							let mat_block_2 = rq.create_material_block(&prog, &[]);
+	
+							let vertex_block = rq.create_vertex_input_block(
+								&layout,
+								&[buffer::Binding{ slot: 0, slice: mesh2.vb.raw.as_raw_buf_slice()}], None);
+							let vertex_block_2 = rq.create_vertex_input_block(
+								&layout,
+								&[buffer::Binding{ slot: 0, slice: mesh2.vb.raw.as_raw_buf_slice()}], 
+								if let Some(ref ib) = mesh2.ib { Some(ib.raw.as_raw_buf_slice()) } else { None });
+	
+							let vertex_block_3 = rq.create_vertex_input_block(
+								&layout,
+								&[buffer::Binding{ slot: 0, slice: cube_mesh.vb.raw.as_raw_buf_slice()}], 
+								Some(cube_mesh.ib.as_ref().unwrap().raw.as_raw_buf_slice()));
+							
+							rq.add_render_item(mat_block, vertex_block_3, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
+							rq.add_render_item(mat_block, vertex_block_2, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
+							//rq.add_render_item(mat_block, vertex_block, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_2.as_raw()}));
+							rq.execute(&frame, None);
+						}
+						rq.clear();
 					}
-					rq.clear();
+					ctx.commit_frame(frame);
+					// borrow of 'tex' ends here? 
 				}
-				ctx.commit_frame(frame);
+
 			},
 
 			_ => {}
@@ -353,4 +358,5 @@ pub fn sample_scene()
 
 		true
 	});
+	
 }

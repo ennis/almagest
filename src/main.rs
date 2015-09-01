@@ -25,7 +25,6 @@ mod attrib;
 mod draw;
 mod texture;
 mod render_queue;
-mod render_target;
 mod camera;
 mod input;
 
