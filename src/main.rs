@@ -26,8 +26,9 @@ mod draw;
 mod texture;
 mod render_queue;
 mod camera;
-mod input;
+mod event;
 mod draw_state;
+mod window;
 
 mod sample_scene;
 

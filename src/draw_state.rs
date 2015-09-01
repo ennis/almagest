@@ -7,10 +7,36 @@ pub enum CullMode
 	None, Front, Back, FrontAndBack
 }
 
+impl CullMode
+{
+	fn to_gl(self) -> GLenum
+	{
+		match self 
+		{
+			CullMode::None => panic!("CullMode::None"),
+			CullMode::Front => gl::FRONT,
+			CullMode::Back => gl::BACK,
+			CullMode::FrontAndBack => gl::FRONT_AND_BACK
+		}
+	}
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum PolygonFillMode
 {
 	Fill, Wireframe
+}
+
+impl PolygonFillMode
+{
+	fn to_gl(self) -> GLenum
+	{
+		match self 
+		{
+			PolygonFillMode::Fill => gl::FILL,
+			PolygonFillMode::Wireframe => gl::LINE
+		}
+	}
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -67,6 +93,36 @@ impl DrawState
 		DrawState {
 			polygon_fill_mode: PolygonFillMode::Wireframe,
 			.. DrawState::default()
+		}
+	}
+	
+	// TODO state cache, redundant state call elimination
+	pub fn sync_state(&self)
+	{
+		unsafe {
+			// set GL states
+			if self.depth_test_enable {
+				gl::Enable(gl::DEPTH_TEST);
+			} else {
+				gl::Disable(gl::DEPTH_TEST);
+			}
+			
+			gl::DepthMask(if self.depth_write_enable { gl::TRUE } else { gl::FALSE });
+			// TODO? fill mode per face
+			gl::PolygonMode(gl::FRONT_AND_BACK, self.polygon_fill_mode.to_gl());
+			
+			match self.cull_mode 
+			{ 
+				CullMode::None => gl::Disable(gl::CULL_FACE),
+				_ => {				
+					gl::Enable(gl::CULL_FACE);
+					gl::CullFace(self.cull_mode.to_gl());
+				}
+			}
+			// TODO specify this
+			gl::Disable(gl::STENCIL_TEST);
+			gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
+			gl::DepthFunc(gl::LEQUAL);
 		}
 	}
 }

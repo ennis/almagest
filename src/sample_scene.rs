@@ -16,9 +16,8 @@ use std;
 
 use num::traits::{Zero};
 use nalgebra::*;
-use std::sync::mpsc::{Receiver};
 use glfw;
-use glfw::{Context, Key, Window, WindowEvent};
+use glfw::{Context, Key, WindowEvent};
 use gl;
 use gl::types::*;
 use libc::{c_void};
@@ -28,10 +27,11 @@ use std::mem;
 use std::path::{Path};
 use image;
 use image::GenericImage;
-use input;
-use input::{Event, InputEvent};
+use event;
+use event::{Event};
 use camera::{Camera, TrackballCameraSettings, TrackballCameraController};
 use glutil::MeshVertex;
+use window::*;
 
 static VS_SOURCE : &'static str = r#"
 #version 440
@@ -118,33 +118,6 @@ fn make_circle(radius: f32, divisions: u16) ->
 }*/
 
 // convert GLFW event loop
-fn event_loop<F: FnMut(Event, &glfw::Window) -> bool>(
-	glfw: &mut glfw::Glfw, 
-	w: &mut glfw::Window, 
-	events: &Receiver<(f64, WindowEvent)>, 
-	mut event_handler: F)
-{
-	 while !w.should_close() {
-	 	// Translate input events
-	    glfw.poll_events();
-	    for (_, event) in glfw::flush_messages(&events) {
-	        match event {
-		        glfw::WindowEvent::Key(Key::Escape, _, glfw::Action::Press, _) => {
-		            w.set_should_close(true);
-		        },
-		        glfw::WindowEvent::Key(k, _, glfw::Action::Press, _) => {
-		        	event_handler(Event::Input(InputEvent::KeyEvent(k)), w);
-		        },
-		        _ => {}
-		    }
-	    }
-	    // send render event
-	    event_handler(Event::Update(0.0f32), w);
-	    event_handler(Event::Render(0.0f32), w);
-	    w.swap_buffers();
-	}
-}
-
 
 pub fn sample_scene() 
 {
@@ -215,13 +188,9 @@ pub fn sample_scene()
 	// GLFW
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::OpenGlDebugContext(true));
-	let (mut window, events) = glfw.create_window(640, 640, "Hello this is window", glfw::WindowMode::Windowed)
-	        .expect("Failed to create GLFW window.");
-	window.set_key_polling(true);
-	window.make_current();
+	
+	let mut win = WindowSettings::new("ALMAGEST", (640, 480)).build(&glfw).expect("Failed to create GLFW window.");
 
-	// Load GL function pointers
-	gl::load_with(|s| window.get_proc_address(s));
 
 	let mut vao: GLuint = 0;
 	unsafe { 
@@ -280,8 +249,7 @@ pub fn sample_scene()
 
 	let mut camera_controller = TrackballCameraSettings::default().build();
 
-
-	event_loop(&mut glfw, &mut window, &events, |event, window| {
+	win.event_loop(&mut glfw, |event, window| {
 		match event {
 			Event::Render(dt) => {
 				// update camera
@@ -291,19 +259,11 @@ pub fn sample_scene()
 					proj_mat: cam.proj_matrix, 
 					u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)};
 
-				// begin frame
-			    unsafe {
-					gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
-					gl::ClearColor(1.0f32, 0.0f32, 0.0f32, 0.0f32);
-					gl::ClearDepth(1.0);
-					gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-					gl::Disable(gl::DEPTH_TEST);
-					gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
-			    }
-
 				{
 					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
-					let frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
+					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
+					let mut frame = ctx.create_frame(RenderTarget::screen((640, 640)));
+					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
 					
 					// put a scope here to end borrow of 'frame' before handing it to ctx
 					{

@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use std::cell::RefCell;
 use frame::Frame;
 use attrib::{InputLayout};
+use draw_state::{DrawState};
 
 /// Per-material states
 struct MaterialBlock<'a>
@@ -164,7 +165,15 @@ impl<'a> RenderQueue<'a>
 			if let Some(pass_uniforms) = pass_uniforms {
 				uniform_bindings.push(pass_uniforms);
 			}
-			frame.draw(vtx_block.vertex_buffers[0].slice, vtx_block.index_buffer, &vtx_block.input_layout, ri.mesh_part, mat_block.prog, &uniform_bindings[..], &[]);
+			frame.draw(
+				vtx_block.vertex_buffers[0].slice, 
+				vtx_block.index_buffer, 
+				&DrawState::default(),
+				&vtx_block.input_layout, 
+				ri.mesh_part, 
+				mat_block.prog, 
+				&uniform_bindings[..], 
+				&[]);
 
 		}
 	}

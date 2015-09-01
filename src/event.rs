@@ -1,23 +1,20 @@
 use glfw;
 use glfw::{Key};
 
-pub enum InputEvent
-{
-	MouseButtonEvent(glfw::MouseButton),
-	MouseMoveEvent(f32, f32),
-	MouseWheelEvent(f32),
-	KeyEvent(glfw::Key)
-}
-
 // A game loop event
 pub enum Event 
 {
 	// Input event 
-	Input(InputEvent),
+	MouseButton(glfw::MouseButton),
+	// TODO: relative mouse position 
+	MouseMove(f64, f64),
+	// wheel delta
+	MouseWheel(f64),
+	KeyDown(glfw::Key),
 	// dt since last update
-	Update(f32),
+	Update(f64),
 	// dt since last render
-	Render(f32)
+	Render(f64)
 }
 
 pub enum Action 
@@ -33,11 +30,11 @@ pub enum Action
 }
 
 // Translates input events to actions
-pub struct InputMapper;
+/*pub struct InputMapper;
 
 impl InputMapper
 {
-	pub fn map(&self, ie: InputEvent) -> Option<Action>
+	pub fn map(&self, ie: Event) -> Option<Action>
 	{
 		match ie {
 			InputEvent::MouseMoveEvent(x, y) => Some(Action::MoveA(x, y)),
@@ -53,4 +50,4 @@ impl InputMapper
 			}
 		}
 	}
-}
+}*/

@@ -10,6 +10,7 @@ use attrib::*;
 use shader::{Program};
 use draw::*;
 use texture::Texture2D;
+use draw_state::{DrawState};
 
 
 pub struct RenderTarget<'a>
@@ -88,7 +89,9 @@ fn create_framebuffer(color_targets: &[&mut Texture2D]) -> GLuint
 
 impl<'a> Frame<'a>
 {
-	pub fn new(buffer_allocator: &'a BufferAllocator, render_target: RenderTarget<'a>) -> Frame<'a>
+	pub fn new(
+		buffer_allocator: &'a BufferAllocator, 
+		render_target: RenderTarget<'a>) -> Frame<'a>
 	{
 		// TODO non-random arena size
 		let fbo = match render_target.output {
@@ -101,7 +104,36 @@ impl<'a> Frame<'a>
 			render_target: render_target,
 			framebuffer: fbo
 		}
+		
+		// TODO setup default state elsewhere
 	}
+	
+	pub fn clear(&mut self, color: Option<[f32; 4]>, depth: Option<f32>)
+	{
+
+		match (color, depth) {
+			(Some(color), Some(depth)) => {
+				unsafe {
+					gl::ClearColor(color[0], color[1], color[2], color[3]);
+					gl::ClearDepth(depth as GLclampd);
+					gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+				}
+			},
+			(Some(color), None) => {
+				unsafe {
+					gl::ClearColor(color[0], color[1], color[2], color[3]);
+					gl::Clear(gl::COLOR_BUFFER_BIT);
+				}
+			},
+			(None, Some(depth)) => {
+				unsafe {
+					gl::ClearDepth(depth as GLclampd);
+					gl::Clear(gl::DEPTH_BUFFER_BIT);
+				}	
+			}
+			_ => {}
+		}	
+	}	
 
 	pub fn alloc_temporary_buffer<'b, T>(
 		&'b self, 
@@ -117,8 +149,7 @@ impl<'a> Frame<'a>
 			BufferAccess::WriteOnly, 
 			binding, 
 			BufferUsage::Stream,
-			if let Some(d) = initial_data { Some(as_byte_slice(d)) } else { None });
-			//initial_data.map(|d| as_byte_slice(d)));
+			initial_data.map(|d| as_byte_slice(d)));
 		unsafe {
 			self.temporary_buffers.alloc(buf).as_buf_slice(0, num_elements)
 		}
@@ -143,7 +174,8 @@ impl<'a> Frame<'a>
 	pub fn draw(
 		&self, 
 		vertex_buffer: RawBufSlice,
-		index_buffer: Option<RawBufSlice> ,
+		index_buffer: Option<RawBufSlice>,
+		draw_state: &DrawState,
 		layout: &InputLayout, 
 		mesh_part: MeshPart,
 		prog: &Program,
@@ -151,6 +183,7 @@ impl<'a> Frame<'a>
 		textures: &[&Texture2D])
 	{
 		// HERE: rebind framebuffer if necessary
+		draw_state.sync_state();
 		draw_instanced(vertex_buffer, index_buffer, layout, mesh_part, prog, uniform_buffers, textures);
 	}
 }
