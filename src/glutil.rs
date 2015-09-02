@@ -19,7 +19,8 @@ pub struct MeshVertex
 {
 	pub pos: Vec3<f32>,
 	pub norm: Vec3<f32>,
-	pub tg: Vec3<f32>
+	pub tg: Vec3<f32>,
+	pub tex: Vec2<f32>
 }
 
 impl MeshVertex 
@@ -29,7 +30,9 @@ impl MeshVertex
 		MeshVertex {
 			pos: Vec3::new(pos[0], pos[1], pos[2]),
 			norm: Vec3::new(0.0f32, 0.0f32, 0.0f32),
-			tg: Vec3::new(0.0f32, 0.0f32, 0.0f32)}
+			tg: Vec3::new(0.0f32, 0.0f32, 0.0f32),
+			tex: Vec2::new(0.0, 0.0)
+		}
 	}
 }
 

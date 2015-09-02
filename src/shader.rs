@@ -8,6 +8,9 @@ use nalgebra::*;
 use std::mem;
 use std::raw;
 use context::{Context};
+use std::path::Path;
+use std::fs::{File};
+use std::io::{BufReader};
 
 #[derive(Copy, Clone)]
 pub enum ShaderStage
@@ -158,6 +161,16 @@ impl Program
 			}
 		}
 	}
+}
+
+pub fn load_shader_source(path: &Path) -> String
+{
+	use std::io::Read;
+	let f = File::open(path).unwrap();
+	let mut reader = BufReader::new(&f);
+	let mut src = String::new();
+	reader.read_to_string(&mut src).unwrap();
+	src
 }
 
 impl Drop for Program

@@ -32,41 +32,20 @@ use event::{Event};
 use camera::{Camera, TrackballCameraSettings, TrackballCameraController};
 use glutil::MeshVertex;
 use window::*;
+use shader::{load_shader_source};
+use buffer::{Binding};
 
-static VS_SOURCE : &'static str = r#"
-#version 440
-layout (binding = 0) uniform ShaderParams
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct SceneData
 {
-	mat4 viewMatrix;
-	mat4 projMatrix;
-	vec3 uColor;
-};
-in vec3 position;
-out vec2 tc;
-void main() {
-	vec4 temp_pos = projMatrix * viewMatrix * vec4(position, 1.0);
-	gl_Position = temp_pos;
-	//gl_Position = vec4(position.xy, 0.0, 1.0);
-	tc = temp_pos.xy;
+	view_mat: Mat4<f32>,
+	proj_mat: Mat4<f32>,
+	view_proj_mat: Mat4<f32>,
+	light_dir: Vec4<f32>,
+	w_eye: Vec4<f32>,
+	viewport_size: Vec2<f32>
 }
-"#;
-
-static FS_SOURCE : &'static str = r#"
-#version 440
-layout (binding = 0) uniform ShaderParams
-{
-	mat4 viewMatrix;
-	mat4 projMatrix;
-	vec3 uColor;
-};
-
-layout (binding = 0) uniform sampler2D tex0;
-in vec2 tc;
-out vec4 color;
-void main() {
-	color = vec4(uColor, 1.0f);
-}
-"#;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -75,34 +54,28 @@ struct ShaderParams
 	u_color: Vec3<f32>
 }
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct ShaderParams2
-{
-	view_mat: Mat4<f32>,
-	proj_mat: Mat4<f32>,
-	u_color: Vec3<f32>,
-}
-
 
 fn make_circle(radius: f32, divisions: u16) -> 
 	(Vec<glutil::MeshVertex>, Vec<u16>)
 {
 	let nullvec = Vec3::<f32>::zero();
+	let nullvec2 = Vec2::<f32>::zero();
 	assert!(divisions >= 2);
 	let mut result = Vec::with_capacity((1 + divisions) as usize);
 	let mut result_indices = Vec::with_capacity((divisions * 3) as usize);
 	result.push(glutil::MeshVertex {
 		pos: nullvec,
 		norm: nullvec, 
-		tg: nullvec });
+		tg: nullvec,
+		tex: nullvec2  });
 	for i in 0..divisions
 	{
 		let th = ((i as f32) / (divisions as f32)) * 2.0f32 * std::f32::consts::PI;
 		result.push(glutil::MeshVertex {
 			pos: Vec3::new(radius * f32::cos(th), radius * f32::sin(th), 0.0f32), 
 			norm: nullvec, 
-			tg: nullvec });
+			tg: nullvec,
+			tex: nullvec2  });
 		result_indices.push(0u16);
 		result_indices.push(i+1);
 		result_indices.push(if i == divisions-1 { 1 } else { i+2 });
@@ -121,12 +94,6 @@ fn make_circle(radius: f32, divisions: u16) ->
 
 pub fn sample_scene() 
 {
-
-	let mesh_data = [
-		glutil::MeshVertex { pos: Vec3::new(0.0f32, 0.0f32, 1.0f32), norm: Vec3::new(0.0f32, 0.0f32, 0.0f32), tg: Vec3::<f32>::zero() },
-		glutil::MeshVertex { pos: Vec3::new(1.0f32, 1.0f32, 1.0f32), norm: Vec3::new(0.0f32, 0.0f32, 0.0f32), tg: Vec3::<f32>::zero() },
-		glutil::MeshVertex { pos: Vec3::new(0.0f32, 1.0f32, 1.0f32), norm: Vec3::new(0.0f32, 0.0f32, 0.0f32), tg: Vec3::<f32>::zero() }];
-
 	// Cube
 
     let cube_vertex_data = [
@@ -203,7 +170,7 @@ pub fn sample_scene()
 	}
 
 	let ctx = context::Context::new();
-	let prog = ctx.create_program_from_source(VS_SOURCE, FS_SOURCE).expect("Error creating program");
+	let prog = ctx.create_program_from_source(&load_shader_source(Path::new("assets/shaders/default.vs")), &load_shader_source(Path::new("assets/shaders/default.fs"))).expect("Error creating program");
 
 	let (mesh2_vertex, mesh2_indices) = make_circle(1.0f32, 400);
 	let mesh2 = glutil::Mesh::new(
@@ -211,22 +178,17 @@ pub fn sample_scene()
 		&mesh2_vertex,
 		Some(&mesh2_indices));
 
-	let mesh = glutil::Mesh::new(
-		&ctx, 
-		draw::PrimitiveType::Triangle, 
-		&mesh_data, 
-		None);
-
 	let cube_mesh = glutil::Mesh::new(
 		&ctx,
 		draw::PrimitiveType::Triangle,
 		&cube_vertex_data,
 		Some(&cube_index_data));
-	
+
 	let layout = attrib::InputLayout::new(1, &[
 		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float3 },
 		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float3 },
-		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float3 }]);
+		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float3 },
+		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float2 }]);
 
 	//-------------------------------
 	// image test
@@ -253,17 +215,25 @@ pub fn sample_scene()
 		match event {
 			Event::Render(dt) => {
 				// update camera
+				let (vp_width, vp_height) = window.get_size();
 				let cam = camera_controller.get_camera(window);
-				let shader_params = ShaderParams2 { 
+				let scene_data = SceneData {
 					view_mat: cam.view_matrix, 
 					proj_mat: cam.proj_matrix, 
-					u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)};
+					view_proj_mat: cam.proj_matrix * cam.view_matrix,
+					light_dir: Vec4::new(0.0,0.0,0.0,0.0),
+					w_eye: Vec4::new(0.0,0.0,0.0,0.0),
+					viewport_size: Vec2::new(vp_width as f32, vp_height as f32)
+				};
+				
 
 				{
 					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
 					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
 					let mut frame = ctx.create_frame(RenderTarget::screen((640, 640)));
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
+				
+					let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
 					
 					// put a scope here to end borrow of 'frame' before handing it to ctx
 					{
@@ -271,6 +241,7 @@ pub fn sample_scene()
 						//let param_buf = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
 						// allocate another for the lulz
 						//let param_buf_2 = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
+						let scene_data_buf = frame.make_uniform_buffer(&scene_data);
 						let param_buf_3 = frame.make_uniform_buffer(&shader_params);
 	
 	
@@ -284,8 +255,8 @@ pub fn sample_scene()
 								num_vertices: mesh2.num_vertices as u32,
 								num_indices: mesh2.num_indices as u32 };
 	
-							let mat_block = rq.create_material_block(&prog, &[]);
-							let mat_block_2 = rq.create_material_block(&prog, &[]);
+							let mat_block = rq.create_material_block(&prog, &[Binding{slot:0, slice: scene_data_buf.as_raw()}]);
+							let mat_block_2 = rq.create_material_block(&prog, &[Binding{slot:0, slice: scene_data_buf.as_raw()}]);
 	
 							let vertex_block = rq.create_vertex_input_block(
 								&layout,
@@ -300,8 +271,8 @@ pub fn sample_scene()
 								&[buffer::Binding{ slot: 0, slice: cube_mesh.vb.raw.as_raw_buf_slice()}], 
 								Some(cube_mesh.ib.as_ref().unwrap().raw.as_raw_buf_slice()));
 							
-							rq.add_render_item(mat_block, vertex_block_3, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
-							rq.add_render_item(mat_block, vertex_block_2, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_3.as_raw()}));
+							rq.add_render_item(mat_block, vertex_block_3, mesh_part, Some(buffer::Binding{slot: 1, slice: param_buf_3.as_raw()}));
+							rq.add_render_item(mat_block, vertex_block_2, mesh_part, Some(buffer::Binding{slot: 1, slice: param_buf_3.as_raw()}));
 							//rq.add_render_item(mat_block, vertex_block, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_2.as_raw()}));
 							rq.execute(&frame, None);
 						}
