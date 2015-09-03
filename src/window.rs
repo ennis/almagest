@@ -69,6 +69,9 @@ impl Window
 					glfw::WindowEvent::Key(k, _, glfw::Action::Press, _) => {
 						event_handler(Event::KeyDown(k), &self.win);
 					},
+					glfw::WindowEvent::Key(k, _, glfw::Action::Repeat, _) => {
+						event_handler(Event::KeyDown(k), &self.win);
+					},
 					_ => {}
 				}
 			}

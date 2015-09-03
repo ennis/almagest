@@ -14,20 +14,16 @@ layout (std140, binding = 0) uniform SceneData {
 	vec2 viewportSize;	// taille de la fenêtre
 };
 
-layout (std140, binding = 1) uniform MaterialData
-{
-	vec3 uColor;
-};
-
-
 // texture bindings:
 // 0-3: pass textures (shadow maps, etc.)
 // 4-8: per-material textures
 // 8-?: per-object textures
 
-layout (binding = 0) uniform sampler2D tex0;
+layout (binding=0) uniform sampler2D mainTex;
+
 in vec2 tc;
 out vec4 color;
 void main() {
-	color = vec4(uColor, 1.0f);
+	//color = vec4(tc, 0.0, 0.0);
+	color = vec4(texture(mainTex, tc).rgb, 1.0f);
 }

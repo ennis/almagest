@@ -13,10 +13,10 @@ extern crate num;
 extern crate typed_arena;
 extern crate image;
 extern crate smallvec;
+extern crate tobj;
 
 mod scene;
-mod rendering;
-mod glutil;
+mod mesh;
 mod context;
 mod buffer;
 mod frame;
@@ -24,11 +24,11 @@ mod shader;
 mod attrib;
 mod draw;
 mod texture;
-mod render_queue;
 mod camera;
 mod event;
 mod draw_state;
 mod window;
+mod material;
 
 mod sample_scene;
 

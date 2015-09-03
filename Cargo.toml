@@ -13,6 +13,7 @@ num = "*"
 image = "*"
 typed-arena = "*"
 smallvec="*"
+tobj="*"
 
 [dependencies.glfw]
 git = "https://github.com/bjz/glfw-rs.git"

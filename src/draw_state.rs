@@ -2,7 +2,7 @@ use gl;
 use gl::types::*;
 
 #[derive(Copy, Clone, Debug)]
-pub enum CullMode 
+pub enum CullMode
 {
 	None, Front, Back, FrontAndBack
 }
@@ -11,7 +11,7 @@ impl CullMode
 {
 	fn to_gl(self) -> GLenum
 	{
-		match self 
+		match self
 		{
 			CullMode::None => panic!("CullMode::None"),
 			CullMode::Front => gl::FRONT,
@@ -31,7 +31,7 @@ impl PolygonFillMode
 {
 	fn to_gl(self) -> GLenum
 	{
-		match self 
+		match self
 		{
 			PolygonFillMode::Fill => gl::FILL,
 			PolygonFillMode::Wireframe => gl::LINE
@@ -45,7 +45,7 @@ pub enum BlendOp
 	Add,
 	Subtract,
 	ReverseSubtract,
-	Min, 
+	Min,
 	Max,
 }
 
@@ -87,7 +87,7 @@ impl DrawState
 			depth_write_enable: true
 		}
 	}
-	
+
 	pub fn default_wireframe() -> DrawState
 	{
 		DrawState {
@@ -95,7 +95,7 @@ impl DrawState
 			.. DrawState::default()
 		}
 	}
-	
+
 	// TODO state cache, redundant state call elimination
 	pub fn sync_state(&self)
 	{
@@ -106,15 +106,15 @@ impl DrawState
 			} else {
 				gl::Disable(gl::DEPTH_TEST);
 			}
-			
+
 			gl::DepthMask(if self.depth_write_enable { gl::TRUE } else { gl::FALSE });
 			// TODO? fill mode per face
 			gl::PolygonMode(gl::FRONT_AND_BACK, self.polygon_fill_mode.to_gl());
-			
-			match self.cull_mode 
-			{ 
+
+			match self.cull_mode
+			{
 				CullMode::None => gl::Disable(gl::CULL_FACE),
-				_ => {				
+				_ => {
 					gl::Enable(gl::CULL_FACE);
 					gl::CullFace(self.cull_mode.to_gl());
 				}
@@ -126,4 +126,3 @@ impl DrawState
 		}
 	}
 }
-

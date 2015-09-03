@@ -67,7 +67,7 @@ pub struct RawBuffer<'a>
 
 impl<'a> RawBuffer<'a>
 {
-	pub fn as_raw_buf_slice(&self) -> RawBufSlice 
+	pub fn as_raw_buf_slice(&self) -> RawBufSlice
 	{
 		RawBufSlice {raw: self, offset: 0, size: self.size}
 	}
@@ -120,7 +120,7 @@ pub struct BufSlice<'a, T>
 
 impl<'a, T> BufSlice<'a, T>
 {
-	pub fn as_raw(&self) -> RawBufSlice 
+	pub fn as_raw(&self) -> RawBufSlice
 	{
 		RawBufSlice {raw: self.raw, offset: self.offset, size: self.size}
 	}
@@ -175,7 +175,7 @@ impl<'a, T> Buffer<'a, T>
 
 impl<'a> Drop for RawBuffer<'a>
 {
-	fn drop(&mut self) 
+	fn drop(&mut self)
 	{
 		unsafe {
 			//trace!("Deleting buffer {}", self.obj);
@@ -203,7 +203,7 @@ fn get_gl_usage_flags(usage: BufferUsage) -> u32
 
 fn get_gl_access_flags(access: BufferAccess) -> u32
 {
-	match access 
+	match access
 	{
 		BufferAccess::ReadOnly => gl::MAP_READ_BIT,
 		BufferAccess::WriteOnly => gl::MAP_WRITE_BIT,
@@ -213,14 +213,14 @@ fn get_gl_access_flags(access: BufferAccess) -> u32
 
 fn get_gl_storage_flags(access: BufferAccess, usage: BufferUsage) -> u32
 {
-	let access_bits = match access 
+	let access_bits = match access
 	{
 		BufferAccess::ReadOnly => gl::MAP_READ_BIT,
 		BufferAccess::WriteOnly => gl::MAP_WRITE_BIT,
 		BufferAccess::ReadWrite => gl::MAP_READ_BIT | gl::MAP_WRITE_BIT
 	};
 
-	let usage_bits = match usage 
+	let usage_bits = match usage
 	{
 		BufferUsage::Static => 0,
 		BufferUsage::Dynamic => gl::DYNAMIC_STORAGE_BIT,
@@ -233,7 +233,7 @@ fn get_gl_storage_flags(access: BufferAccess, usage: BufferUsage) -> u32
 
 fn get_gl_binding(binding: BufferBindingHint) -> u32
 {
-	match binding 
+	match binding
 	{
 		BufferBindingHint::VertexBuffer => gl::ARRAY_BUFFER,
 		BufferBindingHint::IndexBuffer => gl::ELEMENT_ARRAY_BUFFER,
@@ -245,7 +245,7 @@ impl BufferAllocator
 {
 	pub fn alloc_raw_buffer<'a>(
 		&'a self,
-		byte_size: usize, 
+		byte_size: usize,
 		access: BufferAccess,
 		binding: BufferBindingHint,
 		usage: BufferUsage,
@@ -259,19 +259,19 @@ impl BufferAllocator
 		unsafe {
 			let binding_gl = get_gl_binding(binding);
 			let map_flags = get_gl_access_flags(access) |
-				gl::MAP_PERSISTENT_BIT | 
-				gl::MAP_COHERENT_BIT | 
-				gl::MAP_INVALIDATE_BUFFER_BIT/* | 
+				gl::MAP_PERSISTENT_BIT |
+				gl::MAP_COHERENT_BIT |
+				gl::MAP_INVALIDATE_BUFFER_BIT/* |
 				gl::MAP_UNSYNCHRONIZED_BIT*/;
-			let storage_flags = get_gl_storage_flags(access, usage) /*| 
-				gl::MAP_PERSISTENT_BIT | 
+			let storage_flags = get_gl_storage_flags(access, usage) /*|
+				gl::MAP_PERSISTENT_BIT |
 				gl::MAP_COHERENT_BIT*/;
 			gl::GenBuffers(1, &mut obj);
 			gl::BindBuffer(binding_gl, obj);
 			gl::BufferStorage(
 				binding_gl,
-				byte_size as i64, 
-				if let Some(d) = initial_data { d.as_ptr() as *const GLvoid } else { 0 as *const GLvoid }, 
+				byte_size as i64,
+				if let Some(d) = initial_data { d.as_ptr() as *const GLvoid } else { 0 as *const GLvoid },
 				storage_flags);
 			ptr = gl::MapBufferRange(
 				binding_gl,
@@ -279,7 +279,7 @@ impl BufferAllocator
 				map_flags);
 		}
 		RawBuffer {
-			context: self, 
+			context: self,
 			access: BufferAccess::ReadWrite,
 			obj: obj,
 			size: byte_size,
@@ -289,15 +289,15 @@ impl BufferAllocator
 
 	pub fn alloc_buffer<'a, T>(
 		&'a self,
-		num_elements: usize, 
+		num_elements: usize,
 		access: BufferAccess,
 		binding: BufferBindingHint,
 		usage: BufferUsage,
 		initial_data: Option<&[T]>) -> Buffer<'a, T>
 	{
 		let byte_size = mem::size_of::<T>()*num_elements;
-		Buffer { 
-			raw: self.alloc_raw_buffer(byte_size, access, binding, usage, 
+		Buffer {
+			raw: self.alloc_raw_buffer(byte_size, access, binding, usage,
 				if let Some(slice) = initial_data { Some(as_byte_slice(slice)) } else { None }),
 			_r: PhantomData
 		}
@@ -307,7 +307,7 @@ impl BufferAllocator
 
 pub fn bind_vertex_buffers(layout: &InputLayout, vertex_buffers: &[RawBufSlice])
 {
-	unsafe 
+	unsafe
 	{
 		gl::BindVertexArray(layout.vao);
 		let vbs : Vec<_> = vertex_buffers.iter().map(|&b| b.raw.obj).collect();
@@ -319,7 +319,7 @@ pub fn bind_vertex_buffers(layout: &InputLayout, vertex_buffers: &[RawBufSlice])
 
 pub fn bind_index_buffer(index_buffer: &RawBufSlice)
 {
-	unsafe 
+	unsafe
 	{
 		gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer.raw.obj);
 	}
@@ -327,21 +327,14 @@ pub fn bind_index_buffer(index_buffer: &RawBufSlice)
 
 pub fn bind_uniform_buffers(uniform_buffers: &[Binding])
 {
-	/*unsafe 
-	{
-		let objects : Vec<_> = uniform_buffers.iter().map(|&b| b.raw.obj).collect();
-		let offsets : Vec<_> =  uniform_buffers.iter().map(|&b| b.offset as i64).collect();
-		let sizes : Vec<_> = uniform_buffers.iter().map(|&b| b.size as i64).collect();
-		gl::BindBuffersRange(gl::UNIFORM_BUFFER, 0, uniform_buffers.len() as i32, objects.as_ptr(), offsets.as_ptr(), sizes.as_ptr());
-	}*/
 	for binding in uniform_buffers
 	{
 		unsafe {
 			gl::BindBufferRange(
-				gl::UNIFORM_BUFFER, 
-				binding.slot, 
-				binding.slice.raw.obj, 
-				binding.slice.offset as i64, 
+				gl::UNIFORM_BUFFER,
+				binding.slot,
+				binding.slice.raw.obj,
+				binding.slice.offset as i64,
 				binding.slice.size as i64);
 		}
 	}

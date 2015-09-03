@@ -12,7 +12,6 @@ use draw::*;
 use texture::Texture2D;
 use draw_state::{DrawState};
 
-
 pub struct RenderTarget<'a>
 {
 	viewport: (i32, i32, i32, i32),
@@ -80,7 +79,6 @@ fn create_framebuffer(color_targets: &[&mut Texture2D]) -> GLuint
 		];
 		
 		gl::DrawBuffers(color_targets.len() as GLsizei, draw_buffers[..].as_ptr());
-		
 		assert!(gl::CheckFramebufferStatus(gl::FRAMEBUFFER) == gl::FRAMEBUFFER_COMPLETE);
 	}
 	
@@ -93,7 +91,6 @@ impl<'a> Frame<'a>
 		buffer_allocator: &'a BufferAllocator, 
 		render_target: RenderTarget<'a>) -> Frame<'a>
 	{
-		// TODO non-random arena size
 		let fbo = match render_target.output {
 			RenderTargetOutput::Screen => 0,
 			RenderTargetOutput::Texture { ref color_targets } => create_framebuffer(&color_targets[..])
@@ -110,7 +107,6 @@ impl<'a> Frame<'a>
 	
 	pub fn clear(&mut self, color: Option<[f32; 4]>, depth: Option<f32>)
 	{
-
 		match (color, depth) {
 			(Some(color), Some(depth)) => {
 				unsafe {
@@ -135,7 +131,7 @@ impl<'a> Frame<'a>
 		}	
 	}	
 
-	pub fn alloc_temporary_buffer<'b, T>(
+	pub fn alloc_temporary_buffer<'b, T: Copy>(
 		&'b self, 
 		num_elements: usize, 
 		binding: BufferBindingHint ,
@@ -169,7 +165,6 @@ impl<'a> Frame<'a>
 			self.temporary_buffers.alloc(buf).as_buf_slice(0, 1)
 		}
 	}
-
 
 	pub fn draw(
 		&self, 

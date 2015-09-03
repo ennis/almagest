@@ -1,14 +1,5 @@
 
-use frame;
-use frame::*;
-use buffer;
 use context;
-use shader;
-use attrib;
-use draw;
-use render_queue;
-use texture;
-use glutil;
 use fern;
 use log;
 use time;
@@ -29,23 +20,16 @@ use image;
 use image::GenericImage;
 use event;
 use event::{Event};
-use camera::{Camera, TrackballCameraSettings, TrackballCameraController};
-use glutil::MeshVertex;
+use camera::*;
 use window::*;
-use shader::{load_shader_source};
-use buffer::{Binding};
+use draw::*;
+use scene::*;
+use draw_state::*;
+use frame::*;
+use mesh::*;
+use material::*;
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct SceneData
-{
-	view_mat: Mat4<f32>,
-	proj_mat: Mat4<f32>,
-	view_proj_mat: Mat4<f32>,
-	light_dir: Vec4<f32>,
-	w_eye: Vec4<f32>,
-	viewport_size: Vec2<f32>
-}
+use std::io::{BufRead};
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -56,14 +40,14 @@ struct ShaderParams
 
 
 fn make_circle(radius: f32, divisions: u16) -> 
-	(Vec<glutil::MeshVertex>, Vec<u16>)
+	(Vec<MeshVertex>, Vec<u16>)
 {
 	let nullvec = Vec3::<f32>::zero();
 	let nullvec2 = Vec2::<f32>::zero();
 	assert!(divisions >= 2);
 	let mut result = Vec::with_capacity((1 + divisions) as usize);
 	let mut result_indices = Vec::with_capacity((divisions * 3) as usize);
-	result.push(glutil::MeshVertex {
+	result.push(MeshVertex {
 		pos: nullvec,
 		norm: nullvec, 
 		tg: nullvec,
@@ -71,7 +55,7 @@ fn make_circle(radius: f32, divisions: u16) ->
 	for i in 0..divisions
 	{
 		let th = ((i as f32) / (divisions as f32)) * 2.0f32 * std::f32::consts::PI;
-		result.push(glutil::MeshVertex {
+		result.push(MeshVertex {
 			pos: Vec3::new(radius * f32::cos(th), radius * f32::sin(th), 0.0f32), 
 			norm: nullvec, 
 			tg: nullvec,
@@ -83,14 +67,6 @@ fn make_circle(radius: f32, divisions: u16) ->
 	(result, result_indices)
 }
 
-
-// Input state
-/*pub enum InputState
-{
-
-}*/
-
-// convert GLFW event loop
 
 pub fn sample_scene() 
 {
@@ -137,7 +113,7 @@ pub fn sample_scene()
         16, 18, 17, 18, 16, 19, // front
         20, 21, 22, 22, 23, 20, // back
     ];
-
+	
 	//-------------------------------
 	// LOGGING
 	let logger_config = fern::DispatchConfig {
@@ -158,45 +134,7 @@ pub fn sample_scene()
 	
 	let mut win = WindowSettings::new("ALMAGEST", (640, 480)).build(&glfw).expect("Failed to create GLFW window.");
 
-
-	let mut vao: GLuint = 0;
-	unsafe { 
-		gl::GenVertexArrays(1, &mut vao); 
-		gl::BindVertexArray(vao);
-		// attrib #1 position
-		gl::EnableVertexAttribArray(0);
-		gl::VertexAttribFormat(0, 3, gl::FLOAT, gl::FALSE, 12);
-		gl::VertexAttribBinding(0, 0);
-	}
-
-	let ctx = context::Context::new();
-	let prog = ctx.create_program_from_source(&load_shader_source(Path::new("assets/shaders/default.vs")), &load_shader_source(Path::new("assets/shaders/default.fs"))).expect("Error creating program");
-
-	let (mesh2_vertex, mesh2_indices) = make_circle(1.0f32, 400);
-	let mesh2 = glutil::Mesh::new(
-		&ctx, draw::PrimitiveType::Triangle, 
-		&mesh2_vertex,
-		Some(&mesh2_indices));
-
-	let cube_mesh = glutil::Mesh::new(
-		&ctx,
-		draw::PrimitiveType::Triangle,
-		&cube_vertex_data,
-		Some(&cube_index_data));
-
-	let layout = attrib::InputLayout::new(1, &[
-		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float3 },
-		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float3 },
-		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float3 },
-		attrib::Attribute{ slot: 0, ty: attrib::AttributeType::Float2 }]);
-
-	//-------------------------------
-	// image test
-	let img = image::open(&Path::new("test.jpg")).unwrap();
-	let (w, h) = img.dimensions();
-	let img2 = img.as_rgb8().unwrap();
-	let mut tex = texture::Texture2D::new(w, h, 1, texture::TextureFormat::Unorm8x3, Some(img2));
-
+	// default sampler
 	unsafe {
 		let mut sampler : GLuint = 0;
 		gl::GenSamplers(1, &mut sampler);
@@ -209,8 +147,31 @@ pub fn sample_scene()
 		//tex.bind(0);
 	}
 
-	let mut camera_controller = TrackballCameraSettings::default().build();
+	let ctx = context::Context::new();
 
+	let (mesh2_vertex, mesh2_indices) = make_circle(1.0f32, 400);
+	let mesh2 = Mesh::new(
+		&ctx, PrimitiveType::Triangle, 
+		&mesh2_vertex,
+		Some(&mesh2_indices));
+
+	let cube_mesh = Mesh::new(
+		&ctx,
+		PrimitiveType::Triangle,
+		&cube_vertex_data,
+		Some(&cube_index_data));
+		
+	let banana_mesh = Mesh::load_from_obj(
+		&ctx,
+		Path::new("assets/models/banana.obj"),
+		);
+
+	let mut camera_controller = TrackballCameraSettings::default().build();
+	let mesh_renderer = MeshRenderer::new(&ctx);
+	let material = Material::new(&Path::new("assets/models/tex_banana.jpg"));
+	
+	let mut offset = (0.0, 0.0);
+	
 	win.event_loop(&mut glfw, |event, window| {
 		match event {
 			Event::Render(dt) => {
@@ -221,7 +182,7 @@ pub fn sample_scene()
 					view_mat: cam.view_matrix, 
 					proj_mat: cam.proj_matrix, 
 					view_proj_mat: cam.proj_matrix * cam.view_matrix,
-					light_dir: Vec4::new(0.0,0.0,0.0,0.0),
+					light_dir: Vec4::new(1.0,1.0,0.0,0.0),
 					w_eye: Vec4::new(0.0,0.0,0.0,0.0),
 					viewport_size: Vec2::new(vp_width as f32, vp_height as f32)
 				};
@@ -232,57 +193,31 @@ pub fn sample_scene()
 					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
 					let mut frame = ctx.create_frame(RenderTarget::screen((640, 640)));
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
-				
 					let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
 					
-					// put a scope here to end borrow of 'frame' before handing it to ctx
+
 					{
-						// allocate temp buffer for shader parameters
-						//let param_buf = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
-						// allocate another for the lulz
-						//let param_buf_2 = frame.make_uniform_buffer(&ShaderParams {u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32)});
+						use num::traits::One;
 						let scene_data_buf = frame.make_uniform_buffer(&scene_data);
 						let param_buf_3 = frame.make_uniform_buffer(&shader_params);
-	
-	
-						// render queue test
-						let mut rq = render_queue::RenderQueue::new();
-						{
-							let mesh_part = draw::MeshPart { 
-								primitive_type: draw::PrimitiveType::Triangle,
-								start_vertex: 0,
-								start_index: 0,
-								num_vertices: mesh2.num_vertices as u32,
-								num_indices: mesh2.num_indices as u32 };
-	
-							let mat_block = rq.create_material_block(&prog, &[Binding{slot:0, slice: scene_data_buf.as_raw()}]);
-							let mat_block_2 = rq.create_material_block(&prog, &[Binding{slot:0, slice: scene_data_buf.as_raw()}]);
-	
-							let vertex_block = rq.create_vertex_input_block(
-								&layout,
-								&[buffer::Binding{ slot: 0, slice: mesh2.vb.raw.as_raw_buf_slice()}], None);
-							let vertex_block_2 = rq.create_vertex_input_block(
-								&layout,
-								&[buffer::Binding{ slot: 0, slice: mesh2.vb.raw.as_raw_buf_slice()}], 
-								if let Some(ref ib) = mesh2.ib { Some(ib.raw.as_raw_buf_slice()) } else { None });
-	
-							let vertex_block_3 = rq.create_vertex_input_block(
-								&layout,
-								&[buffer::Binding{ slot: 0, slice: cube_mesh.vb.raw.as_raw_buf_slice()}], 
-								Some(cube_mesh.ib.as_ref().unwrap().raw.as_raw_buf_slice()));
-							
-							rq.add_render_item(mat_block, vertex_block_3, mesh_part, Some(buffer::Binding{slot: 1, slice: param_buf_3.as_raw()}));
-							rq.add_render_item(mat_block, vertex_block_2, mesh_part, Some(buffer::Binding{slot: 1, slice: param_buf_3.as_raw()}));
-							//rq.add_render_item(mat_block, vertex_block, mesh_part, Some(buffer::Binding{slot: 0, slice: param_buf_2.as_raw()}));
-							rq.execute(&frame, None);
-						}
-						rq.clear();
+						
+						let transform = Mat4::<f32>::one();
+						let banana_transform = Iso3::<f32>::one().append_translation(&Vec3::new(offset.0 as f32, offset.1 as f32, 0.0)).to_homogeneous();
+						
+						mesh_renderer.draw_mesh(&cube_mesh, &scene_data, &material, &transform, &frame);
+						mesh_renderer.draw_mesh(&banana_mesh, &scene_data, &material, &banana_transform, &frame);
 					}
-					ctx.commit_frame(frame);
-					// borrow of 'tex' ends here? 
 				}
-
 			},
+		
+			// test: move banana
+			Event::KeyDown(glfw::Key::Z) => {
+				offset = (offset.0, offset.1 + 0.1);
+			},
+			
+			Event::KeyDown(glfw::Key::S) => {
+				offset = (offset.0 + 0.1, offset.1);
+			}
 
 			_ => {}
 		};

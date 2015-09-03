@@ -74,28 +74,9 @@ impl Context
 		self.buffer_allocator.alloc_buffer(num_elements, access, binding, usage, initial_data)
 	}
 
-	pub fn create_shader<'a>(&'a self, source: &str, stage: ShaderStage) -> Option<Shader>
-	{
-		Shader::new(source, stage)
-	}
-
-	pub fn create_program_from_source<'a>(&'a self, vs_source: &str, fs_source: &str) -> Option<Program>
-	{
-		Program::from_source(vs_source, fs_source)
-	}
-
-	pub fn create_program<'a>(&'a self, pipeline: ShaderPipelineDesc) -> Option<Program>
-	{
-		Program::new(pipeline)
-	}
-
 	pub fn create_frame<'a>(&'a self, render_target: RenderTarget<'a>) -> Frame<'a>
 	{
 		Frame::new(&self.buffer_allocator, render_target)
 	}
 
-	pub fn commit_frame<'a>(&'a self, frame: Frame<'a>) 
-	{
-		// nothing to do
-	}
 }
