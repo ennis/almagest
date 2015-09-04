@@ -82,8 +82,8 @@ impl MyTransform
 
 pub struct Entity<'a>
 {
-	mesh: Mesh<'a>,
-	material: Material,
+	mesh: usize,	// mesh index
+	material: usize,	// material index
 	transform: MyTransform
 }
 
@@ -96,6 +96,8 @@ pub struct LightSource
 
 pub struct Scene<'a>
 {
+	meshes: Vec<Mesh<'a>>,
+	materials: Vec<Material>,
 	entities: Vec<Entity<'a>>,
 	light_sources: Vec<LightSource>
 }
