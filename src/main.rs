@@ -1,5 +1,7 @@
 #![feature(raw)]
 #![feature(associated_consts)]
+#![feature(custom_derive, plugin)]
+#![plugin(serde_macros)]
 #![allow(dead_code, unused_imports, unused_variables, non_camel_case_types)]
 extern crate nalgebra;
 extern crate glfw;
@@ -14,6 +16,8 @@ extern crate typed_arena;
 extern crate image;
 extern crate smallvec;
 extern crate tobj;
+extern crate serde;
+extern crate serde_json;
 
 mod scene;
 mod mesh;
@@ -29,6 +33,7 @@ mod event;
 mod draw_state;
 mod window;
 mod material;
+mod scene_data;
 
 mod sample_scene;
 

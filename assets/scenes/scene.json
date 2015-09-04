@@ -1,0 +1,40 @@
+{
+	"entities": [
+		{
+			"mesh": "models/stanford_bunny.obj",
+		 	"material": "models/blue.png",
+			"transform": {
+				"position": {"x": 0.0, "y": 0.0, "z": 0.0},
+				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
+				"scale": 1.0
+			}
+		},
+		{
+			"mesh": "models/stanford_bunny.obj",
+		 	"material": "models/blue.png",
+			"transform": {
+				"position": {"x": 5.0, "y": 0.0, "z": 0.0},
+				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
+				"scale": 1.0
+			}
+		},
+		{
+			"mesh": "models/stanford_bunny.obj",
+		 	"material": "models/tex_banana.jpg",
+			"transform": {
+				"position": {"x": 10.0, "y": 4.0, "z": 0.0},
+				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
+				"scale": 1.0
+			}
+		},
+		{
+			"mesh": "models/stanford_bunny.obj",
+		 	"material": "models/tex_banana.jpg",
+			"transform": {
+				"position": {"x": 15.0, "y": 8.0, "z": 0.0},
+				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
+				"scale": 1.0
+			}
+		}
+	]
+}

@@ -10,7 +10,7 @@ use buffer::*;
 use attrib::*;
 use draw::*;
 use std::path::{Path};
-use scene::*;
+use scene_data::*;
 use draw_state::*;
 use frame::*;
 use tobj;
@@ -114,8 +114,10 @@ impl<'a> Mesh<'a>
 			indices.push(m.indices[i] as u16);
 		}
 		
+		
 		// mesh has texture coordinates
 		if m.texcoords.len() > 0 {
+			println!("texcoords {} positions {}", m.texcoords.len(), m.positions.len());
 			trace!("Mesh has texcoords!");
 			for i in 0..m.positions.len() / 3 {
 				vertices.push(MeshVertex {

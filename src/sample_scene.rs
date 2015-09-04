@@ -28,6 +28,7 @@ use draw_state::*;
 use frame::*;
 use mesh::*;
 use material::*;
+use scene_data::*;
 
 use std::io::{BufRead};
 
@@ -170,6 +171,9 @@ pub fn sample_scene()
 	let mesh_renderer = MeshRenderer::new(&ctx);
 	let material = Material::new(&Path::new("assets/models/tex_banana.jpg"));
 	
+	// load sample scene
+	let scene = Scene::from_file(&ctx, &Path::new("assets"), &Path::new("scenes/scene.json"));
+	
 	let mut offset = (0.0, 0.0);
 	
 	win.event_loop(&mut glfw, |event, window| {
@@ -194,6 +198,8 @@ pub fn sample_scene()
 					let mut frame = ctx.create_frame(RenderTarget::screen((640, 640)));
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
 					let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
+					
+					scene.render(&mesh_renderer, &scene_data, &frame);
 					
 
 					{
