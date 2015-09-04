@@ -33,6 +33,7 @@ impl WindowSettings
 		
 		result.map(|(mut win, events)| {
 			win.set_key_polling(true);
+			win.set_all_polling(true);
 			win.make_current();
 			
 			// Load GL function pointers
@@ -58,6 +59,7 @@ impl Window
 		glfw: &mut glfw::Glfw, 
 		mut event_handler: F)
 	{
+		let (mut last_x, mut last_y) = self.win.get_cursor_pos();
 		while !self.win.should_close() {
 			// Translate input events
 			glfw.poll_events();
@@ -71,6 +73,17 @@ impl Window
 					},
 					glfw::WindowEvent::Key(k, _, glfw::Action::Repeat, _) => {
 						event_handler(Event::KeyDown(k), &self.win);
+					},
+					glfw::WindowEvent::MouseButton(button, action, _) => {
+						event_handler(Event::MouseButton(button, action), &self.win);
+					},
+					glfw::WindowEvent::CursorPos(x, y) => {
+						event_handler(Event::MouseMove(x-last_x, y-last_y), &self.win);
+						last_x = x;
+						last_y = y;
+					},
+					glfw::WindowEvent::Scroll(delta_x, delta_y) => {
+						event_handler(Event::MouseWheel(delta_y), &self.win);
 					},
 					_ => {}
 				}

@@ -5,8 +5,7 @@ use glfw::{Key};
 pub enum Event 
 {
 	// Input event 
-	MouseButton(glfw::MouseButton),
-	// TODO: relative mouse position 
+	MouseButton(glfw::MouseButton, glfw::Action),
 	MouseMove(f64, f64),
 	// wheel delta
 	MouseWheel(f64),
