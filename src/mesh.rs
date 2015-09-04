@@ -124,7 +124,9 @@ impl<'a> Mesh<'a>
 					pos: Vec3::new(m.positions[3*i],
 									m.positions[3*i+1],
 									m.positions[3*i+2]),
-					norm: Vec3::new(0.0, 0.0, 0.0),
+					norm: Vec3::new(m.normals[3*i],
+									m.normals[3*i+1],
+									m.normals[3*i+2]),
 					tg: Vec3::new(0.0, 0.0, 0.0),
 					tex: Vec2::new(m.texcoords[2*i], m.texcoords[2*i+1])
 				});
@@ -137,7 +139,9 @@ impl<'a> Mesh<'a>
 					pos: Vec3::new(m.positions[3*i],
 									m.positions[3*i+1],
 									m.positions[3*i+2]),
-					norm: Vec3::new(0.0, 0.0, 0.0),
+					norm: Vec3::new(m.normals[3*i],
+									m.normals[3*i+1],
+									m.normals[3*i+2]),
 					tg: Vec3::new(0.0, 0.0, 0.0),
 					tex: Vec2::new(m.positions[3*i], m.positions[3*i+1])
 				});

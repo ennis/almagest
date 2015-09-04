@@ -185,16 +185,7 @@ pub fn sample_scene()
 				// update camera
 				let (vp_width, vp_height) = window.get_size();
 				let cam = camera_controller.get_camera(window);
-				let scene_data = SceneData {
-					view_mat: cam.view_matrix,
-					proj_mat: cam.proj_matrix,
-					view_proj_mat: cam.proj_matrix * cam.view_matrix,
-					light_dir: Vec4::new(1.0,1.0,0.0,0.0),
-					w_eye: Vec4::new(0.0,0.0,0.0,0.0),
-					viewport_size: Vec2::new(vp_width as f32, vp_height as f32)
-				};
-
-
+				
 				{
 					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
 					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
@@ -202,10 +193,9 @@ pub fn sample_scene()
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
 					let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
 
-					scene.render(&mesh_renderer, &scene_data, &frame);
+					scene.render(&mesh_renderer, &cam, &frame);
 
-
-					{
+					/*{
 						use num::traits::One;
 						let scene_data_buf = frame.make_uniform_buffer(&scene_data);
 						let param_buf_3 = frame.make_uniform_buffer(&shader_params);
@@ -215,7 +205,7 @@ pub fn sample_scene()
 
 						mesh_renderer.draw_mesh(&cube_mesh, &scene_data, &material, &transform, &frame);
 						mesh_renderer.draw_mesh(&banana_mesh, &scene_data, &material, &banana_transform, &frame);
-					}
+					}*/
 				}
 			},
 

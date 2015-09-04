@@ -12,6 +12,9 @@ layout (std140, binding = 0) uniform SceneData {
 	vec4 lightDir;
 	vec4 wEye;	// in world space
 	vec2 viewportSize;	// taille de la fenêtre
+	vec3 wLightPos;
+	vec3 lightColor;
+	float lightIntensity;
 };
 
 layout (std140, binding = 1) uniform ObjectData {
@@ -27,12 +30,18 @@ layout(location=0) in vec3 position;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec3 tangent;
 layout(location=3) in vec2 texcoords;
+
 out vec2 tc;
+out vec3 wPos;
+out vec3 wN;
 
 void main() {
-	vec4 wPos = modelMatrix * vec4(position, 1.0);
-	vec4 temp_pos = projMatrix * viewMatrix * wPos;
+	vec4 wPos_tmp = modelMatrix * vec4(position, 1.0);
+	// TODO normal matrix
+	vec4 wN_tmp = modelMatrix * vec4(normal, 0.0);
+	vec4 temp_pos = projMatrix * viewMatrix * wPos_tmp;
 	gl_Position = temp_pos;
-	//gl_Position = vec4(position.xy, 0.0, 1.0);
 	tc = texcoords;
+	wPos = wPos_tmp.xyz;
+	wN = wN_tmp.xyz;
 }

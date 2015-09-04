@@ -9,9 +9,26 @@ use std::fs::{File};
 use std::io::{BufReader};
 use frame::*;
 use scene_data::*;
+use camera::*;
 
 //-------------------------------------------
 // JSON scene representation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JsonSceneColor
+{
+	r: f32,
+	g: f32,
+	b: f32
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JsonSceneLightSource
+{
+	position: JsonSceneVec3,
+	color: JsonSceneColor,
+	intensity: f32
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsonSceneVec3
 {
@@ -39,6 +56,7 @@ pub struct JsonSceneEntity
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsonSceneFile
 {
+	light_sources: Vec<JsonSceneLightSource>,
 	entities: Vec<JsonSceneEntity>
 }
 // end JSON repr
@@ -69,9 +87,17 @@ pub struct Entity<'a>
 	transform: MyTransform
 }
 
+pub struct LightSource
+{
+	position: Vec3<f32>,
+	intensity: f32,
+	color: Vec3<f32>
+}
+
 pub struct Scene<'a>
 {
-	entities: Vec<Entity<'a>>	
+	entities: Vec<Entity<'a>>,
+	light_sources: Vec<LightSource>
 }
 
 impl<'a> Scene<'a>
@@ -90,6 +116,7 @@ impl<'a> Scene<'a>
 		
 		// load all meshes and materials
 		let mut entities = Vec::<Entity<'b>>::new();
+		let mut light_sources = Vec::<LightSource>::new();
 		for scene_ent in scene_json.entities.iter()
 		{
 			entities.push(Entity {
@@ -101,17 +128,39 @@ impl<'a> Scene<'a>
 					scale: scene_ent.transform.scale
 				}
 			});
-		}		
+		}
 		
-		Scene { entities: entities }
+		// setup light sources
+		for ls in scene_json.light_sources.iter()
+		{
+			light_sources.push(LightSource {
+				position: Vec3::new(ls.position.x, ls.position.y, ls.position.z),
+				intensity: ls.intensity,
+				color: Vec3::new(ls.color.r, ls.color.g, ls.color.b)
+			});
+		}	
+		
+		Scene { entities: entities, light_sources: light_sources }
 	}
 	
-	pub fn render(&self, mesh_renderer: &MeshRenderer, scene_data: &SceneData, frame: &Frame)
+	pub fn render(&self, mesh_renderer: &MeshRenderer, cam: &Camera, frame: &Frame)
 	{
-		use num::traits::One;
+		let rt_dim = frame.dimensions(); 
+		let scene_data = SceneData {
+			view_mat: cam.view_matrix,
+			proj_mat: cam.proj_matrix,
+			view_proj_mat: cam.proj_matrix * cam.view_matrix,
+			light_dir: Vec4::new(1.0,1.0,0.0,0.0),
+			w_eye: Vec4::new(0.0,0.0,0.0,0.0),
+			viewport_size: Vec2::new(rt_dim.0 as f32, rt_dim.1 as f32),
+			light_pos: self.light_sources[0].position,
+			light_color: self.light_sources[0].color,
+			light_intensity: self.light_sources[0].intensity
+		};
+				
 		for ent in self.entities.iter()
 		{
-			mesh_renderer.draw_mesh(&ent.mesh, scene_data, &ent.material, &ent.transform.to_mat4(), frame); 
+			mesh_renderer.draw_mesh(&ent.mesh, &scene_data, &ent.material, &ent.transform.to_mat4(), frame); 
 		}
 	}
 }

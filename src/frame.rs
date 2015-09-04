@@ -87,6 +87,11 @@ fn create_framebuffer(color_targets: &[&mut Texture2D]) -> GLuint
 
 impl<'a> Frame<'a>
 {
+	pub fn dimensions(&self) -> (u32, u32)
+	{
+		(self.render_target.viewport.2 as u32, self.render_target.viewport.3 as u32)
+	}
+	
 	pub fn new(
 		buffer_allocator: &'a BufferAllocator, 
 		render_target: RenderTarget<'a>) -> Frame<'a>
