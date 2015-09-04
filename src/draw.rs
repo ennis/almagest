@@ -2,9 +2,9 @@ use gl;
 use gl::types::*;
 use std::mem;
 use buffer::{RawBuffer, BufSlice, RawBufSlice, BufferAccess, Binding,
-			BufferBindingHint, BufferUsage, 
-			BufferAllocator, as_byte_slice, 
-			bind_vertex_buffers, 
+			BufferBindingHint, BufferUsage,
+			BufferAllocator, as_byte_slice,
+			bind_vertex_buffers,
 			bind_index_buffer,
 			bind_uniform_buffers};
 use typed_arena::{Arena};
@@ -21,7 +21,7 @@ pub enum PrimitiveType
 	Triangle
 }
 
-impl PrimitiveType 
+impl PrimitiveType
 {
 	pub fn to_gl_mode(self) -> u32
 	{
@@ -47,13 +47,13 @@ pub struct MeshPart
 pub fn draw_instanced(
 		vertex_buffer: RawBufSlice,
 		index_buffer: Option<RawBufSlice>,
-		layout: &InputLayout, 
+		layout: &InputLayout,
 		part: MeshPart,
 		prog: &Program,
 		uniform_buffers: &[Binding],
 		textures: &[&Texture2D])
 {
-	unsafe 
+	unsafe
 	{
 		gl::UseProgram(prog.obj);
 		bind_uniform_buffers(uniform_buffers);
@@ -71,7 +71,7 @@ pub fn draw_instanced(
 				gl::UNSIGNED_SHORT,
 				(part.start_index * 2) as *const GLvoid,
 				1, part.start_vertex as i32, 0);
-		} 
+		}
 		else
 		{
 			gl::DrawArraysInstanced(

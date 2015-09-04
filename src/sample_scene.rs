@@ -40,7 +40,7 @@ struct ShaderParams
 }
 
 
-fn make_circle(radius: f32, divisions: u16) -> 
+fn make_circle(radius: f32, divisions: u16) ->
 	(Vec<MeshVertex>, Vec<u16>)
 {
 	let nullvec = Vec3::<f32>::zero();
@@ -50,15 +50,15 @@ fn make_circle(radius: f32, divisions: u16) ->
 	let mut result_indices = Vec::with_capacity((divisions * 3) as usize);
 	result.push(MeshVertex {
 		pos: nullvec,
-		norm: nullvec, 
+		norm: nullvec,
 		tg: nullvec,
 		tex: nullvec2  });
 	for i in 0..divisions
 	{
 		let th = ((i as f32) / (divisions as f32)) * 2.0f32 * std::f32::consts::PI;
 		result.push(MeshVertex {
-			pos: Vec3::new(radius * f32::cos(th), radius * f32::sin(th), 0.0f32), 
-			norm: nullvec, 
+			pos: Vec3::new(radius * f32::cos(th), radius * f32::sin(th), 0.0f32),
+			norm: nullvec,
 			tg: nullvec,
 			tex: nullvec2  });
 		result_indices.push(0u16);
@@ -69,7 +69,7 @@ fn make_circle(radius: f32, divisions: u16) ->
 }
 
 
-pub fn sample_scene() 
+pub fn sample_scene()
 {
 	// Cube
 
@@ -114,7 +114,7 @@ pub fn sample_scene()
         16, 18, 17, 18, 16, 19, // front
         20, 21, 22, 22, 23, 20, // back
     ];
-	
+
 	//-------------------------------
 	// LOGGING
 	let logger_config = fern::DispatchConfig {
@@ -132,7 +132,7 @@ pub fn sample_scene()
 	// GLFW
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::OpenGlDebugContext(true));
-	
+
 	let mut win = WindowSettings::new("ALMAGEST", (640, 480)).build(&glfw).expect("Failed to create GLFW window.");
 
 	// default sampler
@@ -152,7 +152,7 @@ pub fn sample_scene()
 
 	let (mesh2_vertex, mesh2_indices) = make_circle(1.0f32, 400);
 	let mesh2 = Mesh::new(
-		&ctx, PrimitiveType::Triangle, 
+		&ctx, PrimitiveType::Triangle,
 		&mesh2_vertex,
 		Some(&mesh2_indices));
 
@@ -161,7 +161,7 @@ pub fn sample_scene()
 		PrimitiveType::Triangle,
 		&cube_vertex_data,
 		Some(&cube_index_data));
-		
+
 	let banana_mesh = Mesh::load_from_obj(
 		&ctx,
 		Path::new("assets/models/banana.obj"),
@@ -170,27 +170,30 @@ pub fn sample_scene()
 	let mut camera_controller = TrackballCameraSettings::default().build();
 	let mesh_renderer = MeshRenderer::new(&ctx);
 	let material = Material::new(&Path::new("assets/models/tex_banana.jpg"));
-	
+
 	// load sample scene
 	let scene = Scene::from_file(&ctx, &Path::new("assets"), &Path::new("scenes/scene.json"));
-	
+
 	let mut offset = (0.0, 0.0);
-	
+
 	win.event_loop(&mut glfw, |event, window| {
+
+		camera_controller.event(&event);
+
 		match event {
 			Event::Render(dt) => {
 				// update camera
 				let (vp_width, vp_height) = window.get_size();
 				let cam = camera_controller.get_camera(window);
 				let scene_data = SceneData {
-					view_mat: cam.view_matrix, 
-					proj_mat: cam.proj_matrix, 
+					view_mat: cam.view_matrix,
+					proj_mat: cam.proj_matrix,
 					view_proj_mat: cam.proj_matrix * cam.view_matrix,
 					light_dir: Vec4::new(1.0,1.0,0.0,0.0),
 					w_eye: Vec4::new(0.0,0.0,0.0,0.0),
 					viewport_size: Vec2::new(vp_width as f32, vp_height as f32)
 				};
-				
+
 
 				{
 					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
@@ -198,29 +201,29 @@ pub fn sample_scene()
 					let mut frame = ctx.create_frame(RenderTarget::screen((640, 640)));
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
 					let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
-					
+
 					scene.render(&mesh_renderer, &scene_data, &frame);
-					
+
 
 					{
 						use num::traits::One;
 						let scene_data_buf = frame.make_uniform_buffer(&scene_data);
 						let param_buf_3 = frame.make_uniform_buffer(&shader_params);
-						
+
 						let transform = Mat4::<f32>::one();
 						let banana_transform = Iso3::<f32>::one().append_translation(&Vec3::new(offset.0 as f32, offset.1 as f32, 0.0)).to_homogeneous();
-						
+
 						mesh_renderer.draw_mesh(&cube_mesh, &scene_data, &material, &transform, &frame);
 						mesh_renderer.draw_mesh(&banana_mesh, &scene_data, &material, &banana_transform, &frame);
 					}
 				}
 			},
-		
+
 			// test: move banana
 			Event::KeyDown(glfw::Key::Z) => {
 				offset = (offset.0, offset.1 + 0.1);
 			},
-			
+
 			Event::KeyDown(glfw::Key::S) => {
 				offset = (offset.0 + 0.1, offset.1);
 			}
@@ -230,5 +233,5 @@ pub fn sample_scene()
 
 		true
 	});
-	
+
 }
