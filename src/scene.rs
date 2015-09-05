@@ -10,6 +10,7 @@ use std::io::{BufReader};
 use frame::*;
 use scene_data::*;
 use camera::*;
+use std::collections::{HashMap};
 
 //-------------------------------------------
 // JSON scene representation
@@ -42,7 +43,7 @@ pub struct JsonSceneTransform
 {
 	position: JsonSceneVec3,
 	rotation: JsonSceneVec3,
-	scale: f32	
+	scale: f32
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -80,7 +81,7 @@ impl MyTransform
 	}
 }
 
-pub struct Entity<'a>
+pub struct Entity
 {
 	mesh: usize,	// mesh index
 	material: usize,	// material index
@@ -98,7 +99,7 @@ pub struct Scene<'a>
 {
 	meshes: Vec<Mesh<'a>>,
 	materials: Vec<Material>,
-	entities: Vec<Entity<'a>>,
+	entities: Vec<Entity>,
 	light_sources: Vec<LightSource>
 }
 
@@ -115,15 +116,47 @@ impl<'a> Scene<'a>
 		// load JSON repr
 		let scene_json : JsonSceneFile = serde_json::de::from_reader(reader).unwrap();
 		println!("{:?}", scene_json);
-		
+
 		// load all meshes and materials
-		let mut entities = Vec::<Entity<'b>>::new();
+		let mut entities = Vec::<Entity>::new();
 		let mut light_sources = Vec::<LightSource>::new();
+
+		let mut meshes = Vec::<Mesh>::new();
+		let mut materials = Vec::<Material>::new();
+
+		let mut hm = HashMap::new();
+
 		for scene_ent in scene_json.entities.iter()
 		{
+			let mesh_id =
+				if !hm.contains_key(&scene_ent.mesh) {
+					let mesh_path = &root.join(&Path::new(&scene_ent.mesh));
+					let m = Mesh::load_from_obj(context, mesh_path);
+					meshes.push(m);
+					let mesh_id = meshes.len()-1;
+					hm.insert(&scene_ent.mesh, mesh_id);
+					mesh_id
+				} else {
+					trace!("Already loaded: {}", scene_ent.mesh);
+					*hm.get(&scene_ent.mesh).unwrap()
+				};
+
+			let material_id =
+				if !hm.contains_key(&scene_ent.material) {
+					let material_path = &root.join(&Path::new(&scene_ent.material));
+					let mat = Material::new(material_path);
+					materials.push(mat);
+					let mat_id = materials.len()-1;
+					hm.insert(&scene_ent.material, mat_id);
+					mat_id
+				} else {
+					trace!("Already loaded: {}", scene_ent.material);
+					*hm.get(&scene_ent.material).unwrap()
+				};
+
 			entities.push(Entity {
-				mesh: Mesh::load_from_obj(context, &root.join(&Path::new(&scene_ent.mesh))),
-				material: Material::new(&root.join(&Path::new(&scene_ent.material))),
+				mesh: mesh_id,
+				material: material_id,
 				transform: MyTransform {
 					position: Vec3::new(scene_ent.transform.position.x, scene_ent.transform.position.y, scene_ent.transform.position.z),
 					rotation: Vec3::new(scene_ent.transform.rotation.x, scene_ent.transform.rotation.y, scene_ent.transform.rotation.z),
@@ -131,7 +164,7 @@ impl<'a> Scene<'a>
 				}
 			});
 		}
-		
+
 		// setup light sources
 		for ls in scene_json.light_sources.iter()
 		{
@@ -140,14 +173,19 @@ impl<'a> Scene<'a>
 				intensity: ls.intensity,
 				color: Vec3::new(ls.color.r, ls.color.g, ls.color.b)
 			});
-		}	
-		
-		Scene { entities: entities, light_sources: light_sources }
+		}
+
+		Scene {
+			entities: entities,
+			light_sources: light_sources,
+		 	materials: materials,
+			meshes: meshes
+		}
 	}
-	
+
 	pub fn render(&self, mesh_renderer: &MeshRenderer, cam: &Camera, frame: &Frame)
 	{
-		let rt_dim = frame.dimensions(); 
+		let rt_dim = frame.dimensions();
 		let scene_data = SceneData {
 			view_mat: cam.view_matrix,
 			proj_mat: cam.proj_matrix,
@@ -159,10 +197,10 @@ impl<'a> Scene<'a>
 			light_color: self.light_sources[0].color,
 			light_intensity: self.light_sources[0].intensity
 		};
-				
+
 		for ent in self.entities.iter()
 		{
-			mesh_renderer.draw_mesh(&ent.mesh, &scene_data, &ent.material, &ent.transform.to_mat4(), frame); 
+			mesh_renderer.draw_mesh(&self.meshes[ent.mesh], &scene_data, &self.materials[ent.material], &ent.transform.to_mat4(), frame);
 		}
 	}
 }

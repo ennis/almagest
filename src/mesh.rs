@@ -26,7 +26,7 @@ pub struct MeshVertex
 	pub tex: Vec2<f32>
 }
 
-impl MeshVertex 
+impl MeshVertex
 {
 	pub fn new(pos: [f32; 3], tex: [f32; 2]) -> MeshVertex
 	{
@@ -66,29 +66,29 @@ impl MeshRenderer
 				Attribute{ slot: 0, ty: AttributeType::Float3 },
 				Attribute{ slot: 0, ty: AttributeType::Float2 }]),
 			prog: Program::from_source(
-				&load_shader_source(Path::new("assets/shaders/default.vs")), 
+				&load_shader_source(Path::new("assets/shaders/default.vs")),
 				&load_shader_source(Path::new("assets/shaders/default.fs"))).expect("Error creating program")
 		}
 	}
-	
+
 	/// Draw the specified mesh in a scene
 	pub fn draw_mesh(&self,
-			mesh: &Mesh, 
-			scene_data: &SceneData, 
+			mesh: &Mesh,
+			scene_data: &SceneData,
 			material: &Material,
-			transform: &Mat4<f32>, 
+			transform: &Mat4<f32>,
 			frame: &Frame)
 	{
 	 	material.bind();
 		let params = frame.make_uniform_buffer(scene_data);
 		let model_matrix = frame.make_uniform_buffer(transform);
 		frame.draw(
-			mesh.vb.raw.as_raw_buf_slice(), 
+			mesh.vb.raw.as_raw_buf_slice(),
 			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
 			&DrawState::default(),
 			&self.layout,
 			mesh.parts[0],
-			&self.prog, 
+			&self.prog,
 			&[
 				Binding{slot:0, slice: params.as_raw()},
 				Binding{slot:1, slice: model_matrix.as_raw()}
@@ -107,13 +107,13 @@ impl<'a> Mesh<'a>
 		let mut vertices = Vec::<MeshVertex>::new();
 		let mut indices = Vec::<u16>::new();
 		let (models, materials) = tobj::load_obj(path).unwrap();
-		
+
 		let ref m = models[0].mesh;
-		
+
 		for i in 0..m.indices.len() {
 			indices.push(m.indices[i] as u16);
 		}
-		
+
 		
 		// mesh has texture coordinates
 		if m.texcoords.len() > 0 {
@@ -147,22 +147,22 @@ impl<'a> Mesh<'a>
 				});
 			}
 		}
-	
-		Mesh::new(context, PrimitiveType::Triangle, 
+
+		Mesh::new(context, PrimitiveType::Triangle,
 			&vertices[..],
 			Some(&indices[..]))
 	}
-		
+
 	pub fn new(
 		context: &'a Context,
 		primitive_type: PrimitiveType,
-		vertices: &[MeshVertex], 
+		vertices: &[MeshVertex],
 		indices: Option<&[u16]>) -> Mesh<'a>
 	{
 		let vb = context.alloc_buffer_from_data(
-			vertices, 
-			BufferAccess::WriteOnly, 
-			BufferBindingHint::VertexBuffer, 
+			vertices,
+			BufferAccess::WriteOnly,
+			BufferBindingHint::VertexBuffer,
 			BufferUsage::Static);
 		let part = MeshPart{
 				primitive_type: primitive_type,
@@ -172,13 +172,13 @@ impl<'a> Mesh<'a>
 				num_indices: if let Some(inner_indices) = indices { inner_indices.len() as u32 } else { 0 }
 				};
 		if let Some(inner_indices) = indices {
-			Mesh { 
-				vb: vb, 
+			Mesh {
+				vb: vb,
 				ib: Some(context.alloc_buffer_from_data(
-					inner_indices, 
-					BufferAccess::WriteOnly, 
-					BufferBindingHint::IndexBuffer, 
-					BufferUsage::Static)), 
+					inner_indices,
+					BufferAccess::WriteOnly,
+					BufferBindingHint::IndexBuffer,
+					BufferUsage::Static)),
 				parts: vec![part],
 				num_vertices: part.num_vertices as usize,
 				num_indices: part.num_indices as usize
@@ -194,13 +194,13 @@ impl<'a> Mesh<'a>
 			}
 		}
 	}
-	
+
 }
 
 /*
 pub fn draw_mesh(mesh: &Mesh, layout: &InputLayout, mesh_part: usize, prog: &Program)
 {
-	unsafe 
+	unsafe
 	{
 		gl::BindVertexArray(layout.vao);
 		gl::UseProgram(prog.obj);
@@ -208,7 +208,7 @@ pub fn draw_mesh(mesh: &Mesh, layout: &InputLayout, mesh_part: usize, prog: &Pro
 		let offsets = [0];
 		let strides : &[i32] = &layout.strides[..];
 		gl::BindVertexBuffers(0, 1, vbs.as_ptr(), offsets.as_ptr(), strides.as_ptr());
-		
+
 		let part = mesh.parts[mesh_part];
 
 		if let Some(ref ib) = mesh.ib {
