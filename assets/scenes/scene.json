@@ -1,10 +1,15 @@
 {
+	"terrain": {
+		"heightmap": "img/test_heightmap.png",
+		"scale": 100.0,
+		"height_scale": 5.0
+	},
 	"light_sources": [
 		{
 			"position": {"x": 0.0, "y": 0.0, "z": 0.0},
 			"intensity": 10.0,
 			"color": {"r": 1.0, "g": 1.0, "b": 1.0}
-		}	
+		}
 	],
 	"entities": [
 		{

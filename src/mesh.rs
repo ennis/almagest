@@ -114,11 +114,11 @@ impl<'a> Mesh<'a>
 			indices.push(m.indices[i] as u16);
 		}
 
-		
+
 		// mesh has texture coordinates
 		if m.texcoords.len() > 0 {
-			println!("texcoords {} positions {}", m.texcoords.len(), m.positions.len());
-			trace!("Mesh has texcoords!");
+			//println!("texcoords {} positions {}", m.texcoords.len(), m.positions.len());
+			//trace!("Mesh has texcoords!");
 			for i in 0..m.positions.len() / 3 {
 				vertices.push(MeshVertex {
 					pos: Vec3::new(m.positions[3*i],
@@ -130,7 +130,7 @@ impl<'a> Mesh<'a>
 					tg: Vec3::new(0.0, 0.0, 0.0),
 					tex: Vec2::new(m.texcoords[2*i], m.texcoords[2*i+1])
 				});
-				trace!("{},{}", m.texcoords[2*i], m.texcoords[2*i+1]);
+				//trace!("{},{}", m.texcoords[2*i], m.texcoords[2*i+1]);
 			}
 		} else {
 			// mesh doesn't have texture coordinates
@@ -196,37 +196,3 @@ impl<'a> Mesh<'a>
 	}
 
 }
-
-/*
-pub fn draw_mesh(mesh: &Mesh, layout: &InputLayout, mesh_part: usize, prog: &Program)
-{
-	unsafe
-	{
-		gl::BindVertexArray(layout.vao);
-		gl::UseProgram(prog.obj);
-		let vbs = [mesh.vb.raw.obj];
-		let offsets = [0];
-		let strides : &[i32] = &layout.strides[..];
-		gl::BindVertexBuffers(0, 1, vbs.as_ptr(), offsets.as_ptr(), strides.as_ptr());
-
-		let part = mesh.parts[mesh_part];
-
-		if let Some(ref ib) = mesh.ib {
-			gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ib.raw.obj);
-			gl::DrawElementsInstancedBaseVertexBaseInstance(
-				part.primitive_type.to_gl_mode(),
-				part.num_indices as i32,
-				gl::UNSIGNED_SHORT,
-				(part.start_index * 2) as *const GLvoid,
-				1, part.start_vertex as i32, 0);
-		}
-		else
-		{
-			gl::DrawArraysInstanced(
-				part.primitive_type.to_gl_mode(),
-				part.start_vertex as i32,
-				part.num_vertices as i32,
-				1);
-		}
-	}
-}*/

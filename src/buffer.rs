@@ -28,8 +28,10 @@ pub fn object_as_byte_slice<T>(obj: &T) -> &[u8] {
 }
 
 
+/// Buffer access by the CPU
 #[derive(Copy, Clone, Debug)]
 pub enum BufferAccess {
+    // TODO: No immutable, unreadable by CPU
     ReadOnly,
     WriteOnly,
     ReadWrite,

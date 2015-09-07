@@ -34,6 +34,8 @@ mod draw_state;
 mod window;
 mod material;
 mod scene_data;
+mod terrain;
+mod asset_loader;
 
 mod sample_scene;
 

@@ -15,7 +15,7 @@ use libc::{c_void};
 use std::ffi::{CString, CStr};
 use std::cell::{RefCell};
 use std::mem;
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 use image;
 use image::GenericImage;
 use event;
@@ -29,6 +29,11 @@ use frame::*;
 use mesh::*;
 use material::*;
 use scene_data::*;
+use terrain::*;
+use asset_loader::*;
+use std::collections::HashMap;
+use std::rc::Rc;
+use texture::*;
 
 use std::io::{BufRead};
 
@@ -66,6 +71,98 @@ fn make_circle(radius: f32, divisions: u16) ->
 		result_indices.push(if i == divisions-1 { 1 } else { i+2 });
 	}
 	(result, result_indices)
+}
+
+struct AssetCache<T>
+{
+	map: RefCell<HashMap<String, Rc<T>>>
+}
+
+impl<T> AssetCache<T>
+{
+	pub fn new() -> AssetCache<T>
+	{
+		AssetCache {
+			map: RefCell::new(HashMap::new())
+		}
+	}
+
+	fn load_with<F: Fn(&str) -> T>(&self, id: &str, f: F) -> Rc<T>
+	{
+		//self.map.entry(id).or_insert_with(Rc::new(f(id))).clone();
+		let key_found = self.map.borrow().contains_key(id);
+		if !key_found {
+			let val = Rc::new(f(id));
+			self.map.borrow_mut().insert(id.to_string(), val.clone());
+			val
+		} else {
+			trace!("Reusing asset {}", id);
+			self.map.borrow().get(id).unwrap().clone()
+		}
+	}
+}
+
+// Texture & mesh loaders
+struct MyLoader<'a>
+{
+	context: &'a context::Context,
+	asset_root_directory: PathBuf,
+	meshes: AssetCache<Mesh<'a>>,
+	textures: AssetCache<Texture2D>,
+	materials: AssetCache<Material>
+}
+
+impl<'a> MyLoader<'a>
+{
+	fn new(context: &'a context::Context) -> MyLoader<'a>
+	{
+		MyLoader {
+			context: context,
+			asset_root_directory: PathBuf::from("assets"),
+			meshes: AssetCache::new(),
+			textures: AssetCache::new(),
+			materials: AssetCache::new()
+		}
+	}
+}
+
+impl<'a> AssetStore for MyLoader<'a>
+{
+	fn asset_path(&self, asset_id: &str) -> PathBuf
+	{
+		self.asset_root_directory.join(&Path::new(asset_id))
+	}
+}
+
+impl<'a> AssetLoader<Mesh<'a>> for MyLoader<'a>
+{
+	fn load(&self, asset_id: &str) -> Rc<Mesh<'a>>
+	{
+		self.meshes.load_with(asset_id, |id| {
+			Mesh::load_from_obj(self.context, &self.asset_path(asset_id))
+		})
+	}
+}
+
+impl<'a> AssetLoader<Texture2D> for MyLoader<'a>
+{
+	fn load(&self, asset_id: &str) -> Rc<Texture2D>
+	{
+		self.textures.load_with(asset_id, |id| {
+			let img = image::open(&self.asset_path(asset_id)).unwrap();
+			let (dimx, dimy) = img.dimensions();
+			let img2 = img.as_rgb8().unwrap();
+			Texture2D::new(dimx, dimy, 1, TextureFormat::Unorm8x3, Some(img2))
+		})
+	}
+}
+
+impl<'a> AssetLoader<Material> for MyLoader<'a>
+{
+	fn load(&self, asset_id: &str) -> Rc<Material>
+	{
+		self.materials.load_with(asset_id, |id| {Material::new(&self.asset_path(asset_id))})
+	}
 }
 
 
@@ -132,6 +229,7 @@ pub fn sample_scene()
 	// GLFW
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::OpenGlDebugContext(true));
+	glfw.window_hint(glfw::WindowHint::Samples(4));
 
 	let mut win = WindowSettings::new("ALMAGEST", (640, 480)).build(&glfw).expect("Failed to create GLFW window.");
 
@@ -170,9 +268,15 @@ pub fn sample_scene()
 	let mut camera_controller = TrackballCameraSettings::default().build();
 	let mesh_renderer = MeshRenderer::new(&ctx);
 	let material = Material::new(&Path::new("assets/models/tex_banana.jpg"));
+	let loader = MyLoader::new(&ctx);
+
+	let terrain = Terrain::new(&ctx, &Path::new("assets/img/test_heightmap.png"), 1.0, 1.0);
+	let terrain_renderer = TerrainRenderer::new();
+
+	//drop(loader);
 
 	// load sample scene
-	let scene = Scene::from_file(&ctx, &Path::new("assets"), &Path::new("scenes/scene.json"));
+	let scene = Scene::load(&ctx, &loader, &Path::new("assets/scenes/scene.json"));
 
 	let mut offset = (0.0, 0.0);
 
@@ -185,15 +289,17 @@ pub fn sample_scene()
 				// update camera
 				let (vp_width, vp_height) = window.get_size();
 				let cam = camera_controller.get_camera(window);
-				
+
 				{
+					use num::traits::One;
 					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
 					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
 					let mut frame = ctx.create_frame(RenderTarget::screen((640, 640)));
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
-					let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
+					//let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
 
-					scene.render(&mesh_renderer, &cam, &frame);
+					//terrain.render_terrain(&terrain, );
+					scene.render(&mesh_renderer, &terrain_renderer, &cam, &frame);
 
 					/*{
 						use num::traits::One;

@@ -126,27 +126,27 @@ impl TrackballCameraController
 			.prepend_rotation(&(Vec3::new(0.0, 1.0, 0.0) * self.scene_rot.1 as f32));
 		look_at
 	}
-	
+
 	fn update_pan_vectors(&mut self)
 	{
 		let camera_up = Vec3::new(0.0f32, 1.0f32, 0.0f32);
 		let camera_right = Vec3::new(1.0f32, 0.0f32, 0.0f32);
 		let camera_front = Vec3::new(0.0f32, 0.0f32, 1.0f32);
-		
+
 		// update view vectors
 		let inv_look_at = self.get_look_at().inv_transformation();
 		self.w_cam_right = inv_look_at.rotate(&camera_right);
 		self.w_cam_up = inv_look_at.rotate(&camera_up);
 		self.w_cam_front = inv_look_at.rotate(&camera_front);
 	}
-	
+
 	pub fn event(&mut self, event: &Event)
 	{
 		// TODO constants
 		let camera_up = Vec3::new(0.0f32, 1.0f32, 0.0f32);
 		let camera_right = Vec3::new(1.0f32, 0.0f32, 0.0f32);
 		let camera_front = Vec3::new(0.0f32, 0.0f32, 1.0f32);
-		
+
 		match event {
 			&Event::MouseButton(button, action) => {
 				match button {
@@ -176,7 +176,7 @@ impl TrackballCameraController
 				let dx = self.settings.sensitivity * raw_dx;
 				let dy = self.settings.sensitivity * raw_dy;
 				if self.rotating {
-					let rot_speed = 0.5f64;
+					let rot_speed = 0.1f64;
 					let twopi = 2.0 * std::f64::consts::PI;
 					let (scene_rot_x, scene_rot_y) = self.scene_rot;
 					self.scene_rot =
@@ -185,7 +185,7 @@ impl TrackballCameraController
 					// update the panning directions after changing the rotation values
 					self.update_pan_vectors();
 				}
-				
+
 				if self.panning && !self.rotating {
 					let pan_speed = 1.0;
 					self.v_eye = self.v_eye + self.w_cam_right * (dx * pan_speed) as f32 + self.w_cam_up * (dy * pan_speed) as f32;

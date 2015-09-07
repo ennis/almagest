@@ -1,0 +1,5 @@
+Things to fix in rust code:
+=====================================
+
+* Do not use usize for image sizes (replace with u32)
+* Safe APIs

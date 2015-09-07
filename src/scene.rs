@@ -11,9 +11,20 @@ use frame::*;
 use scene_data::*;
 use camera::*;
 use std::collections::{HashMap};
+use asset_loader::*;
+use std::rc::Rc;
+use terrain::{Terrain, TerrainRenderer};
 
 //-------------------------------------------
 // JSON scene representation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JsonSceneTerrain
+{
+	heightmap: String,
+	scale: f32,
+	height_scale: f32
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsonSceneColor
 {
@@ -58,7 +69,8 @@ pub struct JsonSceneEntity
 pub struct JsonSceneFile
 {
 	light_sources: Vec<JsonSceneLightSource>,
-	entities: Vec<JsonSceneEntity>
+	entities: Vec<JsonSceneEntity>,
+	terrain: Option<JsonSceneTerrain>
 }
 // end JSON repr
 //-------------------------------------------
@@ -81,10 +93,10 @@ impl MyTransform
 	}
 }
 
-pub struct Entity
+pub struct Entity<'a>
 {
-	mesh: usize,	// mesh index
-	material: usize,	// material index
+	mesh: Rc<Mesh<'a>>,	// mesh index
+	material: Rc<Material>,	// material index
 	transform: MyTransform
 }
 
@@ -97,10 +109,9 @@ pub struct LightSource
 
 pub struct Scene<'a>
 {
-	meshes: Vec<Mesh<'a>>,
-	materials: Vec<Material>,
-	entities: Vec<Entity>,
-	light_sources: Vec<LightSource>
+	entities: Vec<Entity<'a>>,
+	light_sources: Vec<LightSource>,
+	terrain: Option<Terrain<'a>>
 }
 
 impl<'a> Scene<'a>
@@ -108,10 +119,11 @@ impl<'a> Scene<'a>
 	/// Load a scene from a JSON file
 	/// root: asset folder root
 	/// scene: subpath of scene in asset root
-	pub fn from_file<'b>(context: &'b Context, root: &Path, scene: &Path) -> Scene<'b>
+	pub fn load<'b, R>(context: &'b Context, loader: &R, scene: &Path) -> Scene<'b>
+			where R: AssetStore + AssetLoader<Material> + AssetLoader<Mesh<'b>>
 	{
 		use std::io::Read;
-		let f = File::open(root.join(scene)).unwrap();
+		let f = File::open(scene).unwrap();
 		let reader = BufReader::new(&f);
 		// load JSON repr
 		let scene_json : JsonSceneFile = serde_json::de::from_reader(reader).unwrap();
@@ -121,42 +133,11 @@ impl<'a> Scene<'a>
 		let mut entities = Vec::<Entity>::new();
 		let mut light_sources = Vec::<LightSource>::new();
 
-		let mut meshes = Vec::<Mesh>::new();
-		let mut materials = Vec::<Material>::new();
-
-		let mut hm = HashMap::new();
-
 		for scene_ent in scene_json.entities.iter()
 		{
-			let mesh_id =
-				if !hm.contains_key(&scene_ent.mesh) {
-					let mesh_path = &root.join(&Path::new(&scene_ent.mesh));
-					let m = Mesh::load_from_obj(context, mesh_path);
-					meshes.push(m);
-					let mesh_id = meshes.len()-1;
-					hm.insert(&scene_ent.mesh, mesh_id);
-					mesh_id
-				} else {
-					trace!("Already loaded: {}", scene_ent.mesh);
-					*hm.get(&scene_ent.mesh).unwrap()
-				};
-
-			let material_id =
-				if !hm.contains_key(&scene_ent.material) {
-					let material_path = &root.join(&Path::new(&scene_ent.material));
-					let mat = Material::new(material_path);
-					materials.push(mat);
-					let mat_id = materials.len()-1;
-					hm.insert(&scene_ent.material, mat_id);
-					mat_id
-				} else {
-					trace!("Already loaded: {}", scene_ent.material);
-					*hm.get(&scene_ent.material).unwrap()
-				};
-
 			entities.push(Entity {
-				mesh: mesh_id,
-				material: material_id,
+				mesh: loader.load(&scene_ent.mesh),
+				material: loader.load(&scene_ent.material),
 				transform: MyTransform {
 					position: Vec3::new(scene_ent.transform.position.x, scene_ent.transform.position.y, scene_ent.transform.position.z),
 					rotation: Vec3::new(scene_ent.transform.rotation.x, scene_ent.transform.rotation.y, scene_ent.transform.rotation.z),
@@ -175,15 +156,17 @@ impl<'a> Scene<'a>
 			});
 		}
 
+		// create terrain
+		let terrain = scene_json.terrain.map(|t| Terrain::new(context, &loader.asset_path(&t.heightmap), t.scale, t.height_scale));
+
 		Scene {
 			entities: entities,
 			light_sources: light_sources,
-		 	materials: materials,
-			meshes: meshes
+			terrain: terrain
 		}
 	}
 
-	pub fn render(&self, mesh_renderer: &MeshRenderer, cam: &Camera, frame: &Frame)
+	pub fn render(&self, mesh_renderer: &MeshRenderer, terrain_renderer: &TerrainRenderer, cam: &Camera, frame: &Frame)
 	{
 		let rt_dim = frame.dimensions();
 		let scene_data = SceneData {
@@ -198,9 +181,14 @@ impl<'a> Scene<'a>
 			light_intensity: self.light_sources[0].intensity
 		};
 
+		if let Some(ref terrain) = self.terrain
+		{
+			terrain_renderer.render_terrain(&terrain, &scene_data, &frame);
+		}
+
 		for ent in self.entities.iter()
 		{
-			mesh_renderer.draw_mesh(&self.meshes[ent.mesh], &scene_data, &self.materials[ent.material], &ent.transform.to_mat4(), frame);
+			mesh_renderer.draw_mesh(&ent.mesh, &scene_data, &ent.material, &ent.transform.to_mat4(), frame);
 		}
 	}
 }
