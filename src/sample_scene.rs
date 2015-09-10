@@ -1,10 +1,10 @@
 
-use context;
 use fern;
 use log;
 use time;
 use std;
 
+use rendering as rd;
 use num::traits::{Zero};
 use nalgebra::*;
 use glfw;
@@ -22,10 +22,7 @@ use event;
 use event::{Event};
 use camera::*;
 use window::*;
-use draw::*;
 use scene::*;
-use draw_state::*;
-use frame::*;
 use mesh::*;
 use material::*;
 use scene_data::*;
@@ -33,7 +30,6 @@ use terrain::*;
 use asset_loader::*;
 use std::collections::HashMap;
 use std::rc::Rc;
-use texture::*;
 
 use std::io::{BufRead};
 
@@ -105,16 +101,16 @@ impl<T> AssetCache<T>
 // Texture & mesh loaders
 struct MyLoader<'a>
 {
-	context: &'a context::Context,
+	context: &'a rd::Context,
 	asset_root_directory: PathBuf,
 	meshes: AssetCache<Mesh<'a>>,
-	textures: AssetCache<Texture2D>,
+	textures: AssetCache<rd::Texture2D>,
 	materials: AssetCache<Material>
 }
 
 impl<'a> MyLoader<'a>
 {
-	fn new(context: &'a context::Context) -> MyLoader<'a>
+	fn new(context: &'a rd::Context) -> MyLoader<'a>
 	{
 		MyLoader {
 			context: context,
@@ -144,15 +140,15 @@ impl<'a> AssetLoader<Mesh<'a>> for MyLoader<'a>
 	}
 }
 
-impl<'a> AssetLoader<Texture2D> for MyLoader<'a>
+impl<'a> AssetLoader<rd::Texture2D> for MyLoader<'a>
 {
-	fn load(&self, asset_id: &str) -> Rc<Texture2D>
+	fn load(&self, asset_id: &str) -> Rc<rd::Texture2D>
 	{
 		self.textures.load_with(asset_id, |id| {
 			let img = image::open(&self.asset_path(asset_id)).unwrap();
 			let (dimx, dimy) = img.dimensions();
 			let img2 = img.as_rgb8().unwrap();
-			Texture2D::new(dimx, dimy, 1, TextureFormat::Unorm8x3, Some(img2))
+			rd::Texture2D::with_pixels(dimx, dimy, 1, rd::TextureFormat::Unorm8x3, Some(img2))
 		})
 	}
 }
@@ -246,17 +242,17 @@ pub fn sample_scene()
 		//tex.bind(0);
 	}
 
-	let ctx = context::Context::new();
+	let ctx = rd::Context::new();
 
 	let (mesh2_vertex, mesh2_indices) = make_circle(1.0f32, 400);
 	let mesh2 = Mesh::new(
-		&ctx, PrimitiveType::Triangle,
+		&ctx, rd::PrimitiveType::Triangle,
 		&mesh2_vertex,
 		Some(&mesh2_indices));
 
 	let cube_mesh = Mesh::new(
 		&ctx,
-		PrimitiveType::Triangle,
+		rd::PrimitiveType::Triangle,
 		&cube_vertex_data,
 		Some(&cube_index_data));
 
@@ -276,7 +272,7 @@ pub fn sample_scene()
 	//drop(loader);
 
 	// load sample scene
-	let scene = Scene::load(&ctx, &loader, &Path::new("assets/scenes/scene.json"));
+	let mut scene = Scene::load(&ctx, &loader, &Path::new("assets/scenes/scene.json"));
 
 	let mut offset = (0.0, 0.0);
 
@@ -291,15 +287,14 @@ pub fn sample_scene()
 				let cam = camera_controller.get_camera(window);
 
 				{
-					use num::traits::One;
 					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
 					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
-					let mut frame = ctx.create_frame(RenderTarget::screen((640, 640)));
+					let mut frame = ctx.create_frame(rd::RenderTarget::screen((640, 480)));
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
 					//let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
 
 					//terrain.render_terrain(&terrain, );
-					scene.render(&mesh_renderer, &terrain_renderer, &cam, &frame);
+					scene.render(&mesh_renderer, &terrain_renderer, &cam, &ctx);
 
 					/*{
 						use num::traits::One;

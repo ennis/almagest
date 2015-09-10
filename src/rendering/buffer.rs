@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::cell::RefCell;
 use std::mem;
 use std::raw;
-use attrib::InputLayout;
+use super::attrib::InputLayout;
 
 /// Treat a given slice as `&[u8]` for the given function call
 pub fn as_byte_slice<T>(slice: &[T]) -> &[u8] {

@@ -21,21 +21,15 @@ extern crate serde_json;
 
 mod scene;
 mod mesh;
-mod context;
-mod buffer;
-mod frame;
-mod shader;
-mod attrib;
-mod draw;
-mod texture;
+mod rendering;
 mod camera;
 mod event;
-mod draw_state;
 mod window;
 mod material;
 mod scene_data;
 mod terrain;
 mod asset_loader;
+mod shadow_pass;
 
 mod sample_scene;
 

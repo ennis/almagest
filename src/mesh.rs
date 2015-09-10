@@ -4,17 +4,12 @@ use libc::{c_void};
 use nalgebra::*;
 use std::mem;
 use std::raw;
-use context::*;
-use shader::*;
-use buffer::*;
-use attrib::*;
-use draw::*;
+use rendering::*;
 use std::path::{Path};
 use scene_data::*;
-use draw_state::*;
-use frame::*;
 use tobj;
 use material::Material;
+use shadow_pass::*;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -52,7 +47,8 @@ pub struct Mesh<'a>
 pub struct MeshRenderer
 {
 	layout: InputLayout,
-	prog: Program
+	prog: Program,
+	shadow_prog: Program
 }
 
 impl MeshRenderer
@@ -67,7 +63,10 @@ impl MeshRenderer
 				Attribute{ slot: 0, ty: AttributeType::Float2 }]),
 			prog: Program::from_source(
 				&load_shader_source(Path::new("assets/shaders/default.vs")),
-				&load_shader_source(Path::new("assets/shaders/default.fs"))).expect("Error creating program")
+				&load_shader_source(Path::new("assets/shaders/default.fs"))).expect("Error creating program"),
+			shadow_prog: Program::from_source(
+				&load_shader_source(Path::new("assets/shaders/default_shadow.vs")),
+				&load_shader_source(Path::new("assets/shaders/default_shadow.fs"))).expect("Error creating program")
 		}
 	}
 
@@ -95,6 +94,40 @@ impl MeshRenderer
 			],
 			&[]);
 	}
+
+	/// Draw on a shadow map
+	pub fn draw_mesh_shadow(&self,
+		mesh: &Mesh,
+		light_data: &LightData,
+		transform: &Mat4<f32>,
+		frame: &Frame)
+	{
+		#[repr(C)]
+		#[derive(Copy, Clone)]
+		struct TransformParams
+		{
+			light_transform: Mat4<f32>,
+			model_matrix: Mat4<f32>
+		}
+
+		let light_matrix = frame.make_uniform_buffer(&TransformParams {
+			model_matrix: *transform,
+			light_transform: light_data.light_matrix
+		});
+
+		frame.draw(
+			mesh.vb.raw.as_raw_buf_slice(),
+			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
+			&DrawState::default(),
+			&self.layout,
+			mesh.parts[0],
+			&self.shadow_prog,
+			&[
+				Binding{slot:0, slice: light_matrix.as_raw()}
+			],
+			&[]);
+	}
+
 }
 
 impl<'a> Mesh<'a>

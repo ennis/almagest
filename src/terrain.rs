@@ -1,15 +1,8 @@
-use texture::*;
-use shader::*;
-use attrib::*;
 use image::{self, GenericImage, Pixel};
 use nalgebra::*;
-use context::*;
 use scene_data::*;
-use draw::*;
-use frame::*;
-use buffer::*;
+use rendering::*;
 use std::path::Path;
-use draw_state::*;
 use asset_loader::*;
 use std::rc::Rc;
 
@@ -81,7 +74,7 @@ impl<'a> Terrain<'a>
 
 
 		let img2 = img.as_rgb8().unwrap();
-        let heightmap_tex = Texture2D::new(dimx, dimy, 1, TextureFormat::Unorm8x3, Some(img2));
+        let heightmap_tex = Texture2D::with_pixels(dimx, dimy, 1, TextureFormat::Unorm8x3, Some(img2));
 
         Terrain {
             heightmap: heightmap_tex,
