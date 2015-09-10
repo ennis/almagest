@@ -116,7 +116,9 @@ pub struct BufSlice<'a, T> {
 
 impl<'a, T> BufSlice<'a, T>
 {
-    pub fn as_raw(&self) -> RawBufSlice {
+    // TODO: with this, we can have multiple overlapping writable
+    // slices of the same buffer, which is not good
+    pub fn as_raw<'b>(&'b self) -> RawBufSlice<'a> {
         RawBufSlice { raw: self.raw, offset: self.offset, size: self.size }
     }
 

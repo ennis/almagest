@@ -23,22 +23,22 @@ impl WindowSettings
 	{
 		WindowSettings {
 			title: title.to_string(),
-			dimensions: (800, 600)
+			dimensions: dimensions
 		}
 	}
-	
+
 	pub fn build(&self, glfw: &glfw::Glfw) -> Option<Window>
 	{
 		let result = glfw.create_window(self.dimensions.0, self.dimensions.1, &self.title, glfw::WindowMode::Windowed);
-		
+
 		result.map(|(mut win, events)| {
 			win.set_key_polling(true);
 			win.set_all_polling(true);
 			win.make_current();
-			
+
 			// Load GL function pointers
 			gl::load_with(|s| win.get_proc_address(s));
-			
+
 			Window {
 				win: win,
 				events: events,
@@ -53,10 +53,10 @@ impl Window
 {
 	pub fn cursor_pos(&self) -> (f64, f64) { self.win.get_cursor_pos() }
 	pub fn mouse_wheel_pos(&self) -> f64 { self.absolute_wheel_pos }
-	
+
 	pub fn event_loop<F: FnMut(Event, &glfw::Window) -> bool>(
 		&mut self,
-		glfw: &mut glfw::Glfw, 
+		glfw: &mut glfw::Glfw,
 		mut event_handler: F)
 	{
 		let (mut last_x, mut last_y) = self.win.get_cursor_pos();

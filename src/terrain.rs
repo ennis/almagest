@@ -101,7 +101,6 @@ impl TerrainRenderer
     {
         use num::traits::One;
         terrain.heightmap.bind(0);
-        let params = frame.make_uniform_buffer(scene_data);
 		let terrain_params = frame.make_uniform_buffer(&TerrainShaderParams {
             scale: terrain.scale,
             height_scale: terrain.height_scale
@@ -120,7 +119,7 @@ impl TerrainRenderer
             },
 			&self.prog,
 			&[
-				Binding{slot:0, slice: params.as_raw()},
+				Binding{slot:0, slice: scene_data.buffer},
                 Binding{slot:1, slice: terrain_params.as_raw()}],
 			&[]);
     }

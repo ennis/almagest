@@ -20,7 +20,6 @@ extern crate serde;
 extern crate serde_json;
 
 mod scene;
-mod mesh;
 mod rendering;
 mod camera;
 mod event;
@@ -30,6 +29,7 @@ mod scene_data;
 mod terrain;
 mod asset_loader;
 mod shadow_pass;
+mod graphics;
 
 mod sample_scene;
 

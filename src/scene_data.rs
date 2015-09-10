@@ -1,8 +1,17 @@
 use nalgebra::*;
+use rendering::RawBufSlice;
+
+pub struct SceneData<'a>
+{
+	/// scene context
+	pub data: SceneContext,
+	/// GPU buffer slice containing the scene context
+	pub buffer: RawBufSlice<'a>
+}
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct SceneData
+pub struct SceneContext
 {
 	pub view_mat: Mat4<f32>,
 	pub proj_mat: Mat4<f32>,
@@ -14,5 +23,3 @@ pub struct SceneData
 	pub light_color: Vec3<f32>,
 	pub light_intensity: f32
 }
-
-

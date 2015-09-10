@@ -1,4 +1,3 @@
-use mesh::*;
 use material::*;
 use std::path::Path;
 use serde;
@@ -14,6 +13,7 @@ use asset_loader::*;
 use std::rc::Rc;
 use terrain::{Terrain, TerrainRenderer};
 use shadow_pass::*;
+use graphics::*;
 
 //-------------------------------------------
 // JSON scene representation
@@ -113,19 +113,7 @@ pub struct Scene<'a>
 	light_sources: Vec<LightSource>,
 	terrain: Option<Terrain<'a>>,
 	// Shadow map render target
-	shadow_map: Texture2D,
-	// blitter shader (for debugging)
-	blit_shader: Program,
-	// dummy layout for blitter
-	blitter_layout: InputLayout
-}
-
-struct Rect
-{
-	top: f32,
-	bottom: f32,
-	left: f32,
-	right: f32
+	shadow_map: Texture2D
 }
 
 impl<'a> Scene<'a>
@@ -177,59 +165,16 @@ impl<'a> Scene<'a>
 			entities: entities,
 			light_sources: light_sources,
 			terrain: terrain,
-			shadow_map: Texture2D::new(1024, 1024, 1, TextureFormat::Depth24),
-			blit_shader: Program::from_source(
-					&load_shader_source(Path::new("assets/shaders/blit.vs")),
-					&load_shader_source(Path::new("assets/shaders/blit.fs"))).expect("Error creating program"),
-			blitter_layout: InputLayout::new(1, &[
-				Attribute { slot:0, ty: AttributeType::Float2 },
-				Attribute { slot:0, ty: AttributeType::Float2 }] )
+			shadow_map: Texture2D::new(1024, 1024, 1, TextureFormat::Depth24)
 		}
 	}
 
-	pub fn blit_tex(&self, texture: &Texture2D, frame: &Frame, rect: &Rect, scene_data_buf: RawBufSlice)
-	{
-		texture.bind(0);
-		// blit rectangle
-
-		#[derive(Copy, Clone)]
-		#[repr(C)]
-		struct Vertex2D {
-			pos: [f32; 2],
-			tex: [f32; 2]
-		}
-		let buf = frame.alloc_temporary_buffer(6, BufferBindingHint::VertexBuffer, Some(&[
-			Vertex2D { pos : [rect.top, rect.left], tex : [0.0, 0.0] },
-			Vertex2D { pos : [rect.top, rect.right],  tex: [0.0, 1.0] },
-			Vertex2D { pos : [rect.bottom, rect.left], tex: [1.0, 0.0] },
-			Vertex2D { pos : [rect.bottom, rect.left], tex: [1.0, 0.0] },
-			Vertex2D { pos : [rect.top, rect.right], tex: [0.0, 1.0] },
-			Vertex2D { pos : [rect.bottom, rect.right], tex: [1.0, 1.0] }
-			]));
-		frame.draw(
-			buf.as_raw(),
-			None,
-			&DrawState::default(),
-			&self.blitter_layout,
-			MeshPart {
-				primitive_type: PrimitiveType::Triangle,
-				start_vertex: 0,
-				start_index: 0,
-				num_vertices: 6,
-				num_indices: 0
-				},
-			&self.blit_shader,
-			&[Binding {slot:0, slice:scene_data_buf}],
-			&[texture]
-			);
-	}
-
-	pub fn render(&mut self, mesh_renderer: &MeshRenderer, terrain_renderer: &TerrainRenderer, cam: &Camera, context: &Context)
+	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, cam: &Camera, context: &Context)
 	{
 		use num::traits::One;
 		{
 			// shadow map: create render target with only one depth map
-			let mut shadow_frame = context.create_frame(RenderTarget::render_to_texture(
+			let mut shadow_frame = graphics.context().create_frame(RenderTarget::render_to_texture(
 				(1024, 1024), vec![], Some(&mut self.shadow_map)));
 			//let mut shadow_frame = context.create_frame(RenderTarget::screen((640, 480)));
 			shadow_frame.clear(None, Some(1.0));
@@ -252,31 +197,44 @@ impl<'a> Scene<'a>
 
 			for ent in self.entities.iter()
 			{
-				mesh_renderer.draw_mesh_shadow(&ent.mesh, &light_data, &ent.transform.to_mat4(), &shadow_frame);
+				//graphics.draw_mesh_shadow(&ent.mesh, &light_data, &ent.transform.to_mat4(), &shadow_frame);
 			}
-
 		}
 
 		{
 			// frame for main pass
-			let mut frame = context.create_frame(RenderTarget::screen((640, 480)));
+			let mut frame = graphics.context().create_frame(RenderTarget::screen((1024, 768)));
 			frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
 			let rt_dim = frame.dimensions();
-			let scene_data = SceneData {
-				view_mat: cam.view_matrix,
-				proj_mat: cam.proj_matrix,
-				view_proj_mat: cam.proj_matrix * cam.view_matrix,
-				light_dir: Vec4::new(1.0,1.0,0.0,0.0),
-				w_eye: Vec4::new(0.0,0.0,0.0,0.0),
-				viewport_size: Vec2::new(rt_dim.0 as f32, rt_dim.1 as f32),
-				light_pos: self.light_sources[0].position,
-				light_color: self.light_sources[0].color,
-				light_intensity: self.light_sources[0].intensity
+
+			// test blit
+			graphics.blit(graphics.default_texture(), &Rect::from_dimensions(0.0, 0.0, 511.0, 511.0), &frame);
+
+			let scene_data = {
+				let data = SceneContext {
+					view_mat: cam.view_matrix,
+					proj_mat: cam.proj_matrix,
+					view_proj_mat: cam.proj_matrix * cam.view_matrix,
+					light_dir: Vec4::new(1.0,1.0,0.0,0.0),
+					w_eye: Vec4::new(0.0,0.0,0.0,0.0),
+					viewport_size: Vec2::new(rt_dim.0 as f32, rt_dim.1 as f32),
+					light_pos: self.light_sources[0].position,
+					light_color: self.light_sources[0].color,
+					light_intensity: self.light_sources[0].intensity
+				};
+				let buf = frame.make_uniform_buffer(&data);
+				SceneData {
+					data: data,
+					buffer: buf.as_raw()
+				}
 			};
 
+
 			// debug shadow map
-			let buf = frame.make_uniform_buffer(&scene_data);
-			self.blit_tex(&self.shadow_map, &frame, &Rect { top: 0.0, bottom: 100.0, left: 0.0, right: 100.0}, buf.as_raw());
+			graphics.blit(
+				&self.shadow_map,
+				&Rect { top: 0.0, bottom: 100.0, left: 0.0, right: 100.0 },
+				&frame);
 
 			if let Some(ref terrain) = self.terrain
 			{
@@ -285,7 +243,7 @@ impl<'a> Scene<'a>
 
 			for ent in self.entities.iter()
 			{
-				mesh_renderer.draw_mesh(&ent.mesh, &scene_data, &ent.material, &ent.transform.to_mat4(), &frame);
+				graphics.draw_mesh(&ent.mesh, &scene_data, &ent.material, &ent.transform.to_mat4(), &frame);
 			}
 		}
 	}

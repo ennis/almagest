@@ -23,13 +23,13 @@ use event::{Event};
 use camera::*;
 use window::*;
 use scene::*;
-use mesh::*;
 use material::*;
 use scene_data::*;
 use terrain::*;
 use asset_loader::*;
 use std::collections::HashMap;
 use std::rc::Rc;
+use graphics::*;
 
 use std::io::{BufRead};
 
@@ -44,24 +44,22 @@ struct ShaderParams
 fn make_circle(radius: f32, divisions: u16) ->
 	(Vec<MeshVertex>, Vec<u16>)
 {
-	let nullvec = Vec3::<f32>::zero();
-	let nullvec2 = Vec2::<f32>::zero();
 	assert!(divisions >= 2);
 	let mut result = Vec::with_capacity((1 + divisions) as usize);
 	let mut result_indices = Vec::with_capacity((divisions * 3) as usize);
 	result.push(MeshVertex {
-		pos: nullvec,
-		norm: nullvec,
-		tg: nullvec,
-		tex: nullvec2  });
+		pos: [0.0; 3],
+		norm: [0.0; 3],
+		tg: [0.0; 3],
+		tex: [0.0; 2]  });
 	for i in 0..divisions
 	{
-		let th = ((i as f32) / (divisions as f32)) * 2.0f32 * std::f32::consts::PI;
+		let th = ((i as f32) / (divisions as f32)) * 2.0 * std::f32::consts::PI;
 		result.push(MeshVertex {
-			pos: Vec3::new(radius * f32::cos(th), radius * f32::sin(th), 0.0f32),
-			norm: nullvec,
-			tg: nullvec,
-			tex: nullvec2  });
+			pos: [radius*f32::cos(th), radius*f32::sin(th), 0.0f32],
+			norm: [0.0; 3],
+			tg: [0.0; 3],
+			tex: [0.0; 2]  });
 		result_indices.push(0u16);
 		result_indices.push(i+1);
 		result_indices.push(if i == divisions-1 { 1 } else { i+2 });
@@ -227,7 +225,7 @@ pub fn sample_scene()
     glfw.window_hint(glfw::WindowHint::OpenGlDebugContext(true));
 	glfw.window_hint(glfw::WindowHint::Samples(4));
 
-	let mut win = WindowSettings::new("ALMAGEST", (640, 480)).build(&glfw).expect("Failed to create GLFW window.");
+	let mut win = WindowSettings::new("ALMAGEST", (1024, 768)).build(&glfw).expect("Failed to create GLFW window.");
 
 	// default sampler
 	unsafe {
@@ -262,9 +260,10 @@ pub fn sample_scene()
 		);
 
 	let mut camera_controller = TrackballCameraSettings::default().build();
-	let mesh_renderer = MeshRenderer::new(&ctx);
+
 	let material = Material::new(&Path::new("assets/models/tex_banana.jpg"));
 	let loader = MyLoader::new(&ctx);
+	let graphics = Graphics::new(&ctx, &loader);
 
 	let terrain = Terrain::new(&ctx, &Path::new("assets/img/test_heightmap.png"), 1.0, 1.0);
 	let terrain_renderer = TerrainRenderer::new();
@@ -289,12 +288,12 @@ pub fn sample_scene()
 				{
 					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
 					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
-					let mut frame = ctx.create_frame(rd::RenderTarget::screen((640, 480)));
+					let mut frame = ctx.create_frame(rd::RenderTarget::screen((1024, 768)));
 					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
 					//let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
 
 					//terrain.render_terrain(&terrain, );
-					scene.render(&mesh_renderer, &terrain_renderer, &cam, &ctx);
+					scene.render(&graphics, &terrain_renderer, &cam, &ctx);
 
 					/*{
 						use num::traits::One;
