@@ -302,12 +302,18 @@ impl<'a> Frame<'a>
 			RenderTargetOutput::Screen => 0,
 			RenderTargetOutput::Texture { ref color_targets, ref depth_target } => create_framebuffer(&color_targets[..], depth_target)
 		};
+
+		unsafe {
+			gl::Viewport(render_target.viewport.0, render_target.viewport.1, render_target.viewport.2, render_target.viewport.3);
+		}
+		
 		Frame {
 			buffer_allocator: buffer_allocator,
 			temporary_buffers: Arena::with_capacity(300),
 			render_target: render_target,
 			framebuffer: fbo
 		}
+
 
 		// TODO setup default state elsewhere
 	}

@@ -2,9 +2,12 @@ use glfw;
 use glfw::{Key};
 
 // A game loop event
-pub enum Event 
+#[derive(Copy,Clone)]
+pub enum Event
 {
-	// Input event 
+	// Window resize event
+	WindowResize(u32, u32),
+	// Input event
 	MouseButton(glfw::MouseButton, glfw::Action),
 	MouseMove(f64, f64),
 	// wheel delta

@@ -243,6 +243,49 @@ impl<'a> Graphics<'a>
 			&[]);
 	}
 
+	/// Draw a mesh with the specified shader and parameters
+	pub fn draw_mesh_shadow(&self, mesh: &Mesh, light: &LightData, transform: &Mat4<f32>, frame: &Frame)
+	{
+		#[repr(C)]
+		#[derive(Copy, Clone)]
+		struct LightParams
+		{
+			light_matrix: Mat4<f32>,
+			model_matrix: Mat4<f32>
+		}
+
+		let light_params = frame.make_uniform_buffer(&LightParams {
+			light_matrix: light.light_matrix,
+			model_matrix: *transform
+			});
+
+		frame.draw(
+			mesh.vb.raw.as_raw_buf_slice(),
+			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
+			&DrawState::default(),
+			&self.mesh_layout,
+			mesh.parts[0],
+			&self.shadow_program,
+			&[
+				Binding{slot:0, slice: light_params.as_raw()}
+			],
+			&[]);
+	}
+
+	/// Draw a mesh with the specified shader and parameters
+	pub fn draw_mesh_with_shader(&self, mesh: &Mesh, prog: &Program, bindings: &[Binding], frame: &Frame)
+	{
+		frame.draw(
+			mesh.vb.raw.as_raw_buf_slice(),
+			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
+			&DrawState::default(),
+			&self.mesh_layout,
+			mesh.parts[0],
+			prog,
+			bindings,
+			&[]);
+	}
+
     /// Draw a mesh in wireframe
     pub fn draw_wire_mesh(&self, frame: &Frame)
     {
@@ -268,12 +311,12 @@ impl<'a> Graphics<'a>
         let (width, height) = frame.dimensions();
 
         let buf = frame.alloc_temporary_buffer(6, BufferBindingHint::VertexBuffer, Some(&[
-            Vertex2D { pos : [rect.top, rect.left], tex : [0.0, 0.0] },
-            Vertex2D { pos : [rect.top, rect.right],  tex: [0.0, 1.0] },
-            Vertex2D { pos : [rect.bottom, rect.left], tex: [1.0, 0.0] },
-            Vertex2D { pos : [rect.bottom, rect.left], tex: [1.0, 0.0] },
-            Vertex2D { pos : [rect.top, rect.right], tex: [0.0, 1.0] },
-            Vertex2D { pos : [rect.bottom, rect.right], tex: [1.0, 1.0] }
+            Vertex2D { pos : [rect.left, rect.top], tex : [0.0, 0.0] },
+            Vertex2D { pos : [rect.right, rect.top],  tex: [1.0, 0.0] },
+            Vertex2D { pos : [rect.left, rect.bottom], tex: [0.0, 1.0] },
+            Vertex2D { pos : [rect.left, rect.bottom], tex: [0.0, 1.0] },
+            Vertex2D { pos : [rect.right, rect.top], tex: [1.0, 0.0] },
+            Vertex2D { pos : [rect.right, rect.bottom], tex: [1.0, 1.0] }
             ]));
         let buf_2 = frame.make_uniform_buffer(&BlitData {
                 viewport_size: [width as f32, height as f32]

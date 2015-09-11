@@ -233,10 +233,11 @@ pub fn sample_scene()
 		gl::GenSamplers(1, &mut sampler);
 		gl::SamplerParameteri(sampler, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
 		gl::SamplerParameteri(sampler, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
-		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_R, gl::REPEAT as i32);
-		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
-		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_R, gl::CLAMP_TO_EDGE as i32);
+		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+		gl::SamplerParameteri(sampler, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
 		gl::BindSampler(0, sampler);
+		gl::BindSampler(1, sampler);
 		//tex.bind(0);
 	}
 
@@ -261,22 +262,16 @@ pub fn sample_scene()
 
 	let mut camera_controller = TrackballCameraSettings::default().build();
 
-	let material = Material::new(&Path::new("assets/models/tex_banana.jpg"));
 	let loader = MyLoader::new(&ctx);
 	let graphics = Graphics::new(&ctx, &loader);
-
-	let terrain = Terrain::new(&ctx, &Path::new("assets/img/test_heightmap.png"), 1.0, 1.0);
 	let terrain_renderer = TerrainRenderer::new();
-
-	//drop(loader);
-
 	// load sample scene
 	let mut scene = Scene::load(&ctx, &loader, &Path::new("assets/scenes/scene.json"));
-
 	let mut offset = (0.0, 0.0);
 
 	win.event_loop(&mut glfw, |event, window| {
 
+		ctx.event(&event);
 		camera_controller.event(&event);
 
 		match event {

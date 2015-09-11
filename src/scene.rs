@@ -113,7 +113,9 @@ pub struct Scene<'a>
 	light_sources: Vec<LightSource>,
 	terrain: Option<Terrain<'a>>,
 	// Shadow map render target
-	shadow_map: Texture2D
+	shadow_map: Texture2D,
+	// shadow render program
+	shadow_prog: Program
 }
 
 impl<'a> Scene<'a>
@@ -165,50 +167,63 @@ impl<'a> Scene<'a>
 			entities: entities,
 			light_sources: light_sources,
 			terrain: terrain,
-			shadow_map: Texture2D::new(1024, 1024, 1, TextureFormat::Depth24)
+			shadow_map: Texture2D::new(1024, 1024, 1, TextureFormat::Depth24),
+			shadow_prog: Program::from_source(
+				&load_shader_source(&loader.asset_path("shaders/default_shadowmap.vs")),
+				&load_shader_source(&loader.asset_path("shaders/default_shadowmap.fs"))).expect("Error creating program"),
 		}
 	}
 
 	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, cam: &Camera, context: &Context)
 	{
 		use num::traits::One;
+
+		let light_direction = Vec3::new(0.0f32, -1.0f32, 0.0f32);
+		// light matrix setup
+		let depth_proj_matrix = OrthoMat3::<f32>::new(20.0, 20.0, -10.0, 10.0);
+		let mut depth_view_matrix = Iso3::<f32>::one();
+		depth_view_matrix.look_at_z(
+			&Pnt3::new(1.0, 1.0, 0.0),
+			&Pnt3::new(0.0, 0.0, 0.0),
+			&Vec3::new(0.0, 0.0, -1.0));
+		depth_view_matrix.inv_mut();
+
+		let light_data = LightData {
+			light_dir: light_direction,
+			light_matrix: *depth_proj_matrix.as_mat() * depth_view_matrix.to_homogeneous()
+		};
+
 		{
 			// shadow map: create render target with only one depth map
 			let mut shadow_frame = graphics.context().create_frame(RenderTarget::render_to_texture(
 				(1024, 1024), vec![], Some(&mut self.shadow_map)));
 			//let mut shadow_frame = context.create_frame(RenderTarget::screen((640, 480)));
 			shadow_frame.clear(None, Some(1.0));
-			// light direction
-			let light_direction = Vec3::new(0.0f32, -1.0f32, 0.0f32);
-
-			// light matrix setup
-			let depth_proj_matrix = OrthoMat3::<f32>::new(20.0, 20.0, -10.0, 10.0);
-			let mut depth_view_matrix = Iso3::<f32>::one();
-			depth_view_matrix.look_at_z(
-				&Pnt3::new(0.0, 1.0, 0.0),
-				&Pnt3::new(0.0, 0.0, 0.0),
-				&Vec3::new(0.0, 0.0, -1.0));
-			depth_view_matrix.inv_mut();
-
-			let light_data = LightData {
-				light_dir: light_direction,
-				light_matrix: *depth_proj_matrix.as_mat() * depth_view_matrix.to_homogeneous()
-			};
-
 			for ent in self.entities.iter()
 			{
-				//graphics.draw_mesh_shadow(&ent.mesh, &light_data, &ent.transform.to_mat4(), &shadow_frame);
+				graphics.draw_mesh_shadow(&ent.mesh, &light_data, &ent.transform.to_mat4(), &shadow_frame);
 			}
 		}
 
 		{
 			// frame for main pass
 			let mut frame = graphics.context().create_frame(RenderTarget::screen((1024, 768)));
-			frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
+			frame.clear(Some([0.1, 0.1, 0.2, 1.0]), Some(1.0));
 			let rt_dim = frame.dimensions();
 
+			// depth matrix with bias
+			let depth_matrix = {
+				let bias = Mat4::<f32>::new(
+					0.5, 0.0, 0.0, 0.5,
+					0.0, 0.5, 0.0, 0.5,
+					0.0, 0.0, 0.5, 0.5,
+					0.0, 0.0, 0.0, 1.0
+					);
+				bias * light_data.light_matrix
+			};
+
 			// test blit
-			graphics.blit(graphics.default_texture(), &Rect::from_dimensions(0.0, 0.0, 511.0, 511.0), &frame);
+			//graphics.blit(graphics.default_texture(), &Rect::from_dimensions(0.0, 0.0, 511.0, 511.0), &frame);
 
 			let scene_data = {
 				let data = SceneContext {
@@ -229,11 +244,12 @@ impl<'a> Scene<'a>
 				}
 			};
 
+			let light_data = frame.make_uniform_buffer(&depth_matrix);
 
 			// debug shadow map
 			graphics.blit(
 				&self.shadow_map,
-				&Rect { top: 0.0, bottom: 100.0, left: 0.0, right: 100.0 },
+				&Rect { top: 0.0, bottom: 300.0, left: 0.0, right: 300.0 },
 				&frame);
 
 			if let Some(ref terrain) = self.terrain
@@ -243,7 +259,13 @@ impl<'a> Scene<'a>
 
 			for ent in self.entities.iter()
 			{
-				graphics.draw_mesh(&ent.mesh, &scene_data, &ent.material, &ent.transform.to_mat4(), &frame);
+				let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
+				ent.material.bind();
+				self.shadow_map.bind(1);
+				graphics.draw_mesh_with_shader(&ent.mesh, &self.shadow_prog,
+					&[Binding {slot:0, slice: scene_data.buffer},
+					  Binding {slot:1, slice:model_data.as_raw()},
+					  Binding {slot:2, slice:light_data.as_raw()}], &frame);
 			}
 		}
 	}

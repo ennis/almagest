@@ -5,13 +5,16 @@ use gl::types::*;
 use gl;
 use libc::c_void;
 use std::ffi::CStr;
+use event::*;
 
-
+// TODO the context should know the window dimensions
+// (and be notified when the window size changes)
 pub struct Context
 {
 	buffer_allocator: BufferAllocator,
 	// three previous frames
 	//last_frames: [Option<Frame<'a>>; 3]
+	// TODO ref to window
 }
 
 extern "system" fn debug_callback(
@@ -79,4 +82,8 @@ impl Context
 		Frame::new(&self.buffer_allocator, render_target)
 	}
 
+	pub fn event(&self, ev: &Event)
+	{
+		// Nothing to do (yet)
+	}
 }
