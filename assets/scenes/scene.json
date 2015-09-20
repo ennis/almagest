@@ -6,7 +6,12 @@
 	},
 	"light_sources": [
 		{
-			"position": {"x": 0.0, "y": 0.0, "z": 0.0},
+			"mode": "directional",
+			"transform": {
+				"position": {"x": 0.0, "y": 0.0, "z": 0.0},
+				"rotation": {"x": 0.0, "y": -1.0, "z": 0.0},
+				"scale": 1.0
+			},
 			"intensity": 10.0,
 			"color": {"r": 1.0, "g": 1.0, "b": 1.0}
 		}
@@ -14,7 +19,9 @@
 	"entities": [
 		{
 			"mesh": "models/cube.obj",
-		 	"material": "models/blue.png",
+		 	"material": {
+				 "texture": "models/blue.png"
+			 },
 			"transform": {
 				"position": {"x": 0.0, "y": 0.0, "z": 0.0},
 				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
@@ -23,7 +30,9 @@
 		},
 		{
 			"mesh": "models/tube.obj",
-		 	"material": "models/blue.png",
+		 	"material": {
+				 "texture": "models/blue.png"
+			 },
 			"transform": {
 				"position": {"x": 5.0, "y": 0.0, "z": 0.0},
 				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
@@ -32,7 +41,9 @@
 		},
 		{
 			"mesh": "models/sphere.obj",
-		 	"material": "models/blue.png",
+		 	"material": {
+				 "texture": "models/blue.png"
+			 },
 			"transform": {
 				"position": {"x": 10.0, "y": 4.0, "z": 0.0},
 				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
@@ -41,7 +52,9 @@
 		},
 		{
 			"mesh": "models/donut.obj",
-		 	"material": "models/blue.png",
+		 	"material": {
+				 "shader": "shaders/unlit.glsl"
+			 },
 			"transform": {
 				"position": {"x": 15.0, "y": 8.0, "z": 0.0},
 				"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},

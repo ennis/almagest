@@ -17,6 +17,9 @@ tobj="*"
 serde = "*"
 serde_json = "*"
 serde_macros = "*"
+bitflags = "0.3"
+combine = "*"
+peg = "*"
 
 [dependencies.glfw]
 git = "https://github.com/bjz/glfw-rs.git"
@@ -24,3 +27,12 @@ default-features = false
 
 [dependencies.gl]
 git = "https://github.com/bjz/gl-rs"
+
+# The benchmarking profile, used for `cargo bench`
+[profile.bench]
+opt-level = 3
+debug = false
+rpath = false
+lto = false
+debug-assertions = false
+codegen-units = 1

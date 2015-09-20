@@ -7,8 +7,9 @@ use rendering::buffer::{RawBuffer, BufSlice, RawBufSlice, BufferAccess,
 use typed_arena::{Arena};
 use std::cell::RefCell;
 use rendering::attrib::*;
-use rendering::shader::{Program};
+use rendering::shader::{GLProgram};
 use rendering::texture::Texture2D;
+use rendering::sampler::Sampler2D;
 
 #[derive(Copy, Clone, Debug)]
 pub enum CullMode
@@ -82,6 +83,13 @@ pub struct DrawState
 	// depth-stencil state
 	depth_test_enable: bool,
 	depth_write_enable: bool
+}
+
+pub struct TextureBinding<'a>
+{
+	pub slot: u32,
+	pub sampler: &'a Sampler2D,
+	pub texture: &'a Texture2D
 }
 
 impl DrawState
@@ -172,9 +180,9 @@ pub fn draw_instanced(
 		index_buffer: Option<RawBufSlice>,
 		layout: &InputLayout,
 		part: MeshPart,
-		prog: &Program,
+		prog: &GLProgram,
 		uniform_buffers: &[Binding],
-		textures: &[&Texture2D])
+		textures: &[TextureBinding])
 {
 	unsafe
 	{
@@ -182,8 +190,9 @@ pub fn draw_instanced(
 		super::buffer::bind_uniform_buffers(uniform_buffers);
 		super::buffer::bind_vertex_buffers(layout, &[vertex_buffer]);
 
-		for (i,t) in textures.iter().enumerate() {
-			t.bind(i as u32);
+		for t in textures.iter() {
+			t.texture.bind(t.slot as u32);
+			t.sampler.bind(t.slot as u32);
 		}
 
 		if let Some(ref ib) = index_buffer {
@@ -249,6 +258,7 @@ pub struct Frame<'a>
 	framebuffer: GLuint
 }
 
+
 fn create_framebuffer(color_targets: &[&mut Texture2D], depth_target: &Option<&mut Texture2D>) -> GLuint
 {
 	let mut fbo : GLuint = 0;
@@ -306,7 +316,7 @@ impl<'a> Frame<'a>
 		unsafe {
 			gl::Viewport(render_target.viewport.0, render_target.viewport.1, render_target.viewport.2, render_target.viewport.3);
 		}
-		
+
 		Frame {
 			buffer_allocator: buffer_allocator,
 			temporary_buffers: Arena::with_capacity(300),
@@ -387,9 +397,9 @@ impl<'a> Frame<'a>
 		draw_state: &DrawState,
 		layout: &InputLayout,
 		mesh_part: MeshPart,
-		prog: &Program,
+		prog: &GLProgram,
 		uniform_buffers: &[Binding],
-		textures: &[&Texture2D])
+		textures: &[TextureBinding])
 	{
 		// HERE: rebind framebuffer if necessary
 		unsafe {

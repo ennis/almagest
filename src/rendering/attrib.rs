@@ -7,7 +7,7 @@ use std::string::{ToString};
 use nalgebra::*;
 use std::mem;
 use std::raw;
-use rendering::shader::{Program};
+use rendering::shader::{GLProgram};
 
 #[derive(Copy, Clone, Debug)]
 pub enum AttributeType

@@ -1,5 +1,5 @@
 use rendering::buffer::{Buffer, BufferAccess, BufferBindingHint, BufferUsage, BufferAllocator};
-use rendering::shader::{Shader, Program, ShaderStage, ShaderPipelineDesc};
+use rendering::shader::{GLShader, GLProgram, ShaderStage, ShaderPipelineDesc};
 use rendering::frame::{Frame, RenderTarget};
 use gl::types::*;
 use gl;

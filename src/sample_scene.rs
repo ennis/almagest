@@ -30,6 +30,7 @@ use asset_loader::*;
 use std::collections::HashMap;
 use std::rc::Rc;
 use graphics::*;
+use player::*;
 
 use std::io::{BufRead};
 
@@ -65,98 +66,6 @@ fn make_circle(radius: f32, divisions: u16) ->
 		result_indices.push(if i == divisions-1 { 1 } else { i+2 });
 	}
 	(result, result_indices)
-}
-
-struct AssetCache<T>
-{
-	map: RefCell<HashMap<String, Rc<T>>>
-}
-
-impl<T> AssetCache<T>
-{
-	pub fn new() -> AssetCache<T>
-	{
-		AssetCache {
-			map: RefCell::new(HashMap::new())
-		}
-	}
-
-	fn load_with<F: Fn(&str) -> T>(&self, id: &str, f: F) -> Rc<T>
-	{
-		//self.map.entry(id).or_insert_with(Rc::new(f(id))).clone();
-		let key_found = self.map.borrow().contains_key(id);
-		if !key_found {
-			let val = Rc::new(f(id));
-			self.map.borrow_mut().insert(id.to_string(), val.clone());
-			val
-		} else {
-			trace!("Reusing asset {}", id);
-			self.map.borrow().get(id).unwrap().clone()
-		}
-	}
-}
-
-// Texture & mesh loaders
-struct MyLoader<'a>
-{
-	context: &'a rd::Context,
-	asset_root_directory: PathBuf,
-	meshes: AssetCache<Mesh<'a>>,
-	textures: AssetCache<rd::Texture2D>,
-	materials: AssetCache<Material>
-}
-
-impl<'a> MyLoader<'a>
-{
-	fn new(context: &'a rd::Context) -> MyLoader<'a>
-	{
-		MyLoader {
-			context: context,
-			asset_root_directory: PathBuf::from("assets"),
-			meshes: AssetCache::new(),
-			textures: AssetCache::new(),
-			materials: AssetCache::new()
-		}
-	}
-}
-
-impl<'a> AssetStore for MyLoader<'a>
-{
-	fn asset_path(&self, asset_id: &str) -> PathBuf
-	{
-		self.asset_root_directory.join(&Path::new(asset_id))
-	}
-}
-
-impl<'a> AssetLoader<Mesh<'a>> for MyLoader<'a>
-{
-	fn load(&self, asset_id: &str) -> Rc<Mesh<'a>>
-	{
-		self.meshes.load_with(asset_id, |id| {
-			Mesh::load_from_obj(self.context, &self.asset_path(asset_id))
-		})
-	}
-}
-
-impl<'a> AssetLoader<rd::Texture2D> for MyLoader<'a>
-{
-	fn load(&self, asset_id: &str) -> Rc<rd::Texture2D>
-	{
-		self.textures.load_with(asset_id, |id| {
-			let img = image::open(&self.asset_path(asset_id)).unwrap();
-			let (dimx, dimy) = img.dimensions();
-			let img2 = img.as_rgb8().unwrap();
-			rd::Texture2D::with_pixels(dimx, dimy, 1, rd::TextureFormat::Unorm8x3, Some(img2))
-		})
-	}
-}
-
-impl<'a> AssetLoader<Material> for MyLoader<'a>
-{
-	fn load(&self, asset_id: &str) -> Rc<Material>
-	{
-		self.materials.load_with(asset_id, |id| {Material::new(&self.asset_path(asset_id))})
-	}
 }
 
 
@@ -261,57 +170,24 @@ pub fn sample_scene()
 		);
 
 	let mut camera_controller = TrackballCameraSettings::default().build();
-
-	let loader = MyLoader::new(&ctx);
-	let graphics = Graphics::new(&ctx, &loader);
+	let graphics = Graphics::new(&ctx);
 	let terrain_renderer = TerrainRenderer::new();
 	// load sample scene
-	let mut scene = Scene::load(&ctx, &loader, &Path::new("assets/scenes/scene.json"));
-	let mut offset = (0.0, 0.0);
+	let mut scene = Scene::load(
+		&ctx,
+		&Path::new("assets"),
+		&Path::new("assets/scenes/scene.json"));
 
 	win.event_loop(&mut glfw, |event, window| {
 
 		ctx.event(&event);
 		camera_controller.event(&event);
+		scene.event(&event);
 
 		match event {
 			Event::Render(dt) => {
-				// update camera
-				let (vp_width, vp_height) = window.get_size();
-				let cam = camera_controller.get_camera(window);
-
-				{
-					//let frame = ctx.create_frame(render_target::RenderTarget::Screen);
-					//let mut frame = ctx.create_frame(RenderTarget::render_to_texture(vec![&mut tex]));
-					let mut frame = ctx.create_frame(rd::RenderTarget::screen((1024, 768)));
-					frame.clear(Some([1.0, 0.0, 0.0, 0.0]), Some(1.0));
-					//let shader_params = ShaderParams { u_color: Vec3::new(0.0f32, 1.0f32, 0.0f32) };
-
-					//terrain.render_terrain(&terrain, );
-					scene.render(&graphics, &terrain_renderer, &cam, &ctx);
-
-					/*{
-						use num::traits::One;
-						let scene_data_buf = frame.make_uniform_buffer(&scene_data);
-						let param_buf_3 = frame.make_uniform_buffer(&shader_params);
-
-						let transform = Mat4::<f32>::one();
-						let banana_transform = Iso3::<f32>::one().append_translation(&Vec3::new(offset.0 as f32, offset.1 as f32, 0.0)).to_homogeneous();
-
-						mesh_renderer.draw_mesh(&cube_mesh, &scene_data, &material, &transform, &frame);
-						mesh_renderer.draw_mesh(&banana_mesh, &scene_data, &material, &banana_transform, &frame);
-					}*/
-				}
+				scene.render(&graphics, &terrain_renderer, &window, &ctx);
 			},
-
-			// test: move banana
-			Event::KeyDown(glfw::Key::Z) => {
-				offset = (offset.0, offset.1 + 0.1);
-			},
-
-			Event::KeyDown(glfw::Key::S) => {
-				offset = (offset.0 + 0.1, offset.1);
-			}
 
 			_ => {}
 		};

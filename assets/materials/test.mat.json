@@ -1,0 +1,6 @@
+{
+  "lighting_model": "standard",
+  "cast_shadows": true,
+  "receive_shadows": true,
+  "shader": "shaders/test.shader.glsl"
+}

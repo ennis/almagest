@@ -1,25 +1,29 @@
 use image;
 use image::{GenericImage};
 use rendering::*;
-use std::path::Path;
+use rendering::shader::*;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::collections::HashMap;
+use std::cell::{RefCell};
+
 
 /// Describes the appearance of an object
 pub struct Material
 {
-	main_tex: Texture2D
+	pub main_tex: Rc<Texture2D>,
+    pub shader: Rc<Shader>,
 }
 
 impl Material
 {
-	/// create a new material from an image file
-	pub fn new(main_tex_path: &Path) -> Material
+	/// create a new material from a shader
+	pub fn new_with_shader(shader: Rc<Shader>, main_tex: Rc<Texture2D>) -> Material
 	{
-		let img = image::open(main_tex_path).unwrap();
-		let (w, h) = img.dimensions();
-		let img2 = img.as_rgb8().unwrap();
-
-		Material {
-			main_tex: Texture2D::with_pixels(w, h, 1, TextureFormat::Unorm8x3, Some(img2))
+		Material
+		{
+            shader: shader,
+			main_tex: main_tex
 		}
 	}
 

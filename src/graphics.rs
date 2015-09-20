@@ -10,6 +10,7 @@ use material::Material;
 use shadow_pass::*;
 use image::{self, GenericImage};
 use asset_loader::*;
+use rendering::shader::*;
 
 pub struct Rect
 {
@@ -156,13 +157,15 @@ impl<'a> Mesh<'a>
 pub struct Graphics<'a>
 {
     context: &'a Context,
+	// Default sampler
+	default_sampler: Sampler2D,
+
     // Vertex layouts
     mesh_layout: InputLayout,
     blit_layout: InputLayout,
     // Shared programs
-    blit_program: Program,
-    default_mesh_program: Program,
-    shadow_program: Program,
+    blit_program: GLProgram,
+    default_mesh_program: GLProgram,
 
     // default (missing) texture (material)
     missing_tex: Texture2D
@@ -172,21 +175,21 @@ fn load_texture2d_from_file(path: &Path) -> Texture2D
 {
     let img = image::open(path).unwrap();
     let (w, h) = img.dimensions();
-    let img2 = img.as_rgba8().unwrap();
-    Texture2D::with_pixels(w, h, 1, TextureFormat::Unorm8x4, Some(img2))
+    let img2 = img.as_rgb8().unwrap();
+    Texture2D::with_pixels(w, h, 1, TextureFormat::Unorm8x3, Some(img2))
 }
 
 impl<'a> Graphics<'a>
 {
-    pub fn new<R: AssetStore>(context: &'a Context, asset_store: &R) -> Graphics<'a>
+    pub fn new(context: &'a Context) -> Graphics<'a>
     {
         //...
         Graphics {
             context: context,
             // blitter
-            blit_program: Program::from_source(
-					&load_shader_source(&asset_store.asset_path("shaders/blit.vs")),
-					&load_shader_source(&asset_store.asset_path("shaders/blit.fs"))).expect("Error creating program"),
+            blit_program: GLProgram::from_source(
+					&load_shader_source(Path::new("assets/shaders/blit.vs")),
+					&load_shader_source(Path::new("assets/shaders/blit.fs"))).expect("Error creating program"),
 			blit_layout: InputLayout::new(1, &[
 				Attribute { slot:0, ty: AttributeType::Float2 },
 				Attribute { slot:0, ty: AttributeType::Float2 }] ),
@@ -196,13 +199,11 @@ impl<'a> Graphics<'a>
 				Attribute{ slot: 0, ty: AttributeType::Float3 },
 				Attribute{ slot: 0, ty: AttributeType::Float3 },
 				Attribute{ slot: 0, ty: AttributeType::Float2 }]),
-			default_mesh_program: Program::from_source(
-				&load_shader_source(&asset_store.asset_path("shaders/default.vs")),
-				&load_shader_source(&asset_store.asset_path("shaders/default.fs"))).expect("Error creating program"),
-			shadow_program: Program::from_source(
-				&load_shader_source(&asset_store.asset_path("shaders/default_shadow.vs")),
-				&load_shader_source(&asset_store.asset_path("shaders/default_shadow.fs"))).expect("Error creating program"),
-            missing_tex: load_texture2d_from_file(&asset_store.asset_path("img/missing_512.png"))
+			default_mesh_program: GLProgram::from_source(
+				&load_shader_source(Path::new("assets/shaders/default.vs")),
+				&load_shader_source(Path::new("assets/shaders/default.fs"))).expect("Error creating program"),
+            missing_tex: load_texture2d_from_file(Path::new("assets/img/missing_512.png")),
+			default_sampler: Sampler2DDesc::default().build()
         }
     }
 
@@ -219,61 +220,8 @@ impl<'a> Graphics<'a>
         self.context
     }
 
-    /// Draw a mesh in the frame
-    pub fn draw_mesh(&self,
-			mesh: &Mesh,
-			scene_data: &SceneData,
-			material: &Material,
-			transform: &Mat4<f32>,
-			frame: &Frame)
-	{
-		material.bind();
-		let model_matrix = frame.make_uniform_buffer(transform);
-		frame.draw(
-			mesh.vb.raw.as_raw_buf_slice(),
-			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
-			&DrawState::default(),
-			&self.mesh_layout,
-			mesh.parts[0],
-			&self.default_mesh_program,
-			&[
-				Binding{slot:0, slice: scene_data.buffer},
-				Binding{slot:1, slice: model_matrix.as_raw()}
-			],
-			&[]);
-	}
-
 	/// Draw a mesh with the specified shader and parameters
-	pub fn draw_mesh_shadow(&self, mesh: &Mesh, light: &LightData, transform: &Mat4<f32>, frame: &Frame)
-	{
-		#[repr(C)]
-		#[derive(Copy, Clone)]
-		struct LightParams
-		{
-			light_matrix: Mat4<f32>,
-			model_matrix: Mat4<f32>
-		}
-
-		let light_params = frame.make_uniform_buffer(&LightParams {
-			light_matrix: light.light_matrix,
-			model_matrix: *transform
-			});
-
-		frame.draw(
-			mesh.vb.raw.as_raw_buf_slice(),
-			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
-			&DrawState::default(),
-			&self.mesh_layout,
-			mesh.parts[0],
-			&self.shadow_program,
-			&[
-				Binding{slot:0, slice: light_params.as_raw()}
-			],
-			&[]);
-	}
-
-	/// Draw a mesh with the specified shader and parameters
-	pub fn draw_mesh_with_shader(&self, mesh: &Mesh, prog: &Program, bindings: &[Binding], frame: &Frame)
+	pub fn draw_mesh_with_shader(&self, mesh: &Mesh, prog: &GLProgram, bindings: &[Binding], frame: &Frame)
 	{
 		frame.draw(
 			mesh.vb.raw.as_raw_buf_slice(),
@@ -336,7 +284,7 @@ impl<'a> Graphics<'a>
                 },
             &self.blit_program,
             &[Binding {slot:0, slice: buf_2.as_raw() }],
-            &[texture]
+            &[TextureBinding {slot: 0, sampler: &self.default_sampler, texture: &texture}]
             );
     }
 

@@ -1,10 +1,12 @@
-use image::{self, GenericImage, Pixel};
+use image::{self, GenericImage, Pixel, GrayImage};
 use nalgebra::*;
 use scene_data::*;
 use rendering::*;
+use rendering::shader::*;
 use std::path::Path;
 use asset_loader::*;
 use std::rc::Rc;
+use std;
 
 struct TerrainVertex
 {
@@ -14,7 +16,8 @@ struct TerrainVertex
 
 pub struct Terrain<'a>
 {
-    heightmap: Texture2D,
+    heightmap_tex: Texture2D,
+    heightmap_img: GrayImage,
     vertex_buffer: Buffer<'a, TerrainVertex>,
     scale: f32,
     height_scale: f32
@@ -22,7 +25,7 @@ pub struct Terrain<'a>
 
 pub struct TerrainRenderer
 {
-    prog: Program,
+    prog: GLProgram,
     layout: InputLayout
 }
 
@@ -35,10 +38,20 @@ struct TerrainShaderParams
 
 impl<'a> Terrain<'a>
 {
+    pub fn sample_height(&self, x: f64, y: f64) -> f64
+    {
+        // TODO sample image
+        let (w, h) = self.heightmap_img.dimensions();
+        (self.heightmap_img.get_pixel(
+            clamp(((x / self.scale as f64) * (w as f64)) as u32, 0, w-1 ),
+            clamp(((y / self.scale as f64) * (h as f64)) as u32, 0, h-1 )).channels()[0] as f64) / (std::u8::MAX as f64) * (self.height_scale as f64)
+    }
+
     pub fn new<'b>(context: &'b Context, heightmap: &Path, scale: f32, height_scale: f32) -> Terrain<'b> {
         // create a 2D grid of vertices
         let img = image::open(heightmap).unwrap();
         let (dimx, dimy) = img.dimensions();
+        let gray_img = img.as_luma8().expect("Wrong heightmap format");
 
         let mut vertices = Vec::<TerrainVertex>::with_capacity((6*(dimx-1)*(dimy-1)) as usize);
 
@@ -71,13 +84,12 @@ impl<'a> Terrain<'a>
             BufferBindingHint::VertexBuffer,
             BufferUsage::Static);
 
-
-
-		let img2 = img.as_rgb8().unwrap();
-        let heightmap_tex = Texture2D::with_pixels(dimx, dimy, 1, TextureFormat::Unorm8x3, Some(img2));
+        let heightmap_tex = Texture2D::with_pixels(dimx, dimy, 1, TextureFormat::Unorm8, Some(gray_img));
 
         Terrain {
-            heightmap: heightmap_tex,
+            heightmap_tex: heightmap_tex,
+            // TODO should not clone here
+            heightmap_img: gray_img.clone(),
             vertex_buffer: buf,
             height_scale: height_scale,
             scale: scale
@@ -91,7 +103,7 @@ impl TerrainRenderer
     {
         TerrainRenderer {
 			layout: InputLayout::new(1, &[Attribute{ slot: 0, ty: AttributeType::Float2 }]),
-			prog: Program::from_source(
+			prog: GLProgram::from_source(
 				&load_shader_source(Path::new("assets/shaders/terrain.vs")),
 				&load_shader_source(Path::new("assets/shaders/terrain.fs"))).expect("Error creating program")
 		}
@@ -100,7 +112,7 @@ impl TerrainRenderer
     pub fn render_terrain(&self, terrain: &Terrain, scene_data: &SceneData, frame: &Frame)
     {
         use num::traits::One;
-        terrain.heightmap.bind(0);
+        terrain.heightmap_tex.bind(0);
 		let terrain_params = frame.make_uniform_buffer(&TerrainShaderParams {
             scale: terrain.scale,
             height_scale: terrain.height_scale
@@ -114,7 +126,7 @@ impl TerrainRenderer
                 primitive_type: PrimitiveType::Triangle,
                 start_vertex: 0,
                 start_index: 0,
-                num_vertices: 6*terrain.heightmap.dimensions().0*terrain.heightmap.dimensions().1,
+                num_vertices: 6*terrain.heightmap_tex.dimensions().0*terrain.heightmap_tex.dimensions().1,
                 num_indices: 0
             },
 			&self.prog,

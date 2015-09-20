@@ -1,9 +1,10 @@
 use material::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use serde;
 use serde_json;
 use nalgebra::*;
 use rendering::*;
+use rendering::shader::*;
 use std::fs::{File};
 use std::io::{BufReader};
 use scene_data::*;
@@ -14,6 +15,10 @@ use std::rc::Rc;
 use terrain::{Terrain, TerrainRenderer};
 use shadow_pass::*;
 use graphics::*;
+use image::{self, GenericImage};
+use event::*;
+use player::*;
+use glfw;
 
 //-------------------------------------------
 // JSON scene representation
@@ -36,9 +41,10 @@ pub struct JsonSceneColor
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsonSceneLightSource
 {
-	position: JsonSceneVec3,
+	transform: JsonSceneTransform,
 	color: JsonSceneColor,
-	intensity: f32
+	intensity: f32,
+	mode: String
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -58,10 +64,17 @@ pub struct JsonSceneTransform
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct JsonSceneMaterial
+{
+	shader: Option<String>,
+	texture: Option<String>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct JsonSceneEntity
 {
 	mesh: String,
-	material: String,
+	material: JsonSceneMaterial,
 	transform: JsonSceneTransform
 }
 
@@ -100,11 +113,12 @@ pub struct Entity<'a>
 	transform: MyTransform
 }
 
-pub struct LightSource
+pub enum LightSource
 {
-	position: Vec3<f32>,
-	intensity: f32,
-	color: Vec3<f32>
+	// direction, color, intensity
+	Directional(Vec3<f32>, Vec3<f32>, f32),
+	// position, color, intensity
+	Point(Vec3<f32>, Vec3<f32>, f32)
 }
 
 pub struct Scene<'a>
@@ -114,8 +128,9 @@ pub struct Scene<'a>
 	terrain: Option<Terrain<'a>>,
 	// Shadow map render target
 	shadow_map: Texture2D,
-	// shadow render program
-	shadow_prog: Program
+	//
+	shader_cache: ShaderCache,
+	player_cam: PlayerCamera,
 }
 
 impl<'a> Scene<'a>
@@ -123,25 +138,63 @@ impl<'a> Scene<'a>
 	/// Load a scene from a JSON file
 	/// root: asset folder root
 	/// scene: subpath of scene in asset root
-	pub fn load<'b, R>(context: &'b Context, loader: &R, scene: &Path) -> Scene<'b>
-			where R: AssetStore + AssetLoader<Material> + AssetLoader<Mesh<'b>>
+	pub fn load<'b>(context: &'b Context, asset_root: &Path, scene: &Path) -> Scene<'b>
 	{
 		use std::io::Read;
 		let f = File::open(scene).unwrap();
 		let reader = BufReader::new(&f);
 		// load JSON repr
 		let scene_json : JsonSceneFile = serde_json::de::from_reader(reader).unwrap();
-		println!("{:?}", scene_json);
+		//trace!("{:?}", scene_json);
 
 		// load all meshes and materials
 		let mut entities = Vec::<Entity>::new();
 		let mut light_sources = Vec::<LightSource>::new();
 
+		let materials = AssetCache::<Material>::new();
+		let meshes = AssetCache::<Mesh<'b>>::new();
+		let textures = AssetCache::<Texture2D>::new();
+		let shaders = AssetCache::<Shader>::new();
+
 		for scene_ent in scene_json.entities.iter()
 		{
+			//info!("*** Loading entity {:?} ***", scene_ent);
+
+			let texture_path = if let Some(ref path) = scene_ent.material.texture {
+					&(*path)[..]
+				} else {
+					"img/missing_512.png"
+				};
+
+			let texture = textures.load_with(texture_path,
+					&|path| {
+						let img = image::open(&asset_root.join(path)).unwrap();
+						let (dimx, dimy) = img.dimensions();
+						// TODO correctly handle different formats
+						let img2 = img.as_rgb8().unwrap();
+						Texture2D::with_pixels(dimx, dimy, 1, TextureFormat::Unorm8x3, Some(img2))
+					});
+
+			let shader_name = if let Some(ref s) = scene_ent.material.shader {
+					asset_root.join(s)
+				} else {
+					asset_root.join("shaders/default.glsl")
+				};
+
+			let shader = shaders.load_with(shader_name.to_str().unwrap(), &|_| {
+				Shader::load(&shader_name)
+			});
+
+
+			let material = Rc::new(Material::new_with_shader(
+				shader,
+				texture));
+
 			entities.push(Entity {
-				mesh: loader.load(&scene_ent.mesh),
-				material: loader.load(&scene_ent.material),
+				mesh: meshes.load_with(&scene_ent.mesh, &|path| {
+					Mesh::load_from_obj(context, &asset_root.join(path))
+				}),
+				material: material,
 				transform: MyTransform {
 					position: Vec3::new(scene_ent.transform.position.x, scene_ent.transform.position.y, scene_ent.transform.position.z),
 					rotation: Vec3::new(scene_ent.transform.rotation.x, scene_ent.transform.rotation.y, scene_ent.transform.rotation.z),
@@ -153,38 +206,91 @@ impl<'a> Scene<'a>
 		// setup light sources
 		for ls in scene_json.light_sources.iter()
 		{
-			light_sources.push(LightSource {
-				position: Vec3::new(ls.position.x, ls.position.y, ls.position.z),
-				intensity: ls.intensity,
-				color: Vec3::new(ls.color.r, ls.color.g, ls.color.b)
-			});
+			if ls.mode == "directional"
+			{
+				light_sources.push(LightSource::Directional(
+					Vec3::new(ls.transform.rotation.x, ls.transform.rotation.y, ls.transform.rotation.z),
+					Vec3::new(ls.color.r, ls.color.g, ls.color.b),
+					ls.intensity));
+
+			}
+			else if ls.mode == "point"
+			{
+				light_sources.push(LightSource::Point(
+					Vec3::new(ls.transform.position.x, ls.transform.position.y, ls.transform.position.z),
+					Vec3::new(ls.color.r, ls.color.g, ls.color.b),
+					ls.intensity));
+			}
 		}
 
 		// create terrain
-		let terrain = scene_json.terrain.map(|t| Terrain::new(context, &loader.asset_path(&t.heightmap), t.scale, t.height_scale));
+		let terrain = scene_json.terrain.map(|t| Terrain::new(context, &asset_root.join(&t.heightmap), t.scale, t.height_scale));
 
 		Scene {
 			entities: entities,
 			light_sources: light_sources,
 			terrain: terrain,
 			shadow_map: Texture2D::new(1024, 1024, 1, TextureFormat::Depth24),
-			shadow_prog: Program::from_source(
-				&load_shader_source(&loader.asset_path("shaders/default_shadowmap.vs")),
-				&load_shader_source(&loader.asset_path("shaders/default_shadowmap.fs"))).expect("Error creating program"),
+			shader_cache: ShaderCache::new(),
+			player_cam: PlayerCamera::new(PlayerCameraSettings
+				{
+				    field_of_view: 45.0,
+					near_plane: 0.01,
+					far_plane: 1000.0,
+					sensitivity: 0.01
+				})
 		}
 	}
 
-	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, cam: &Camera, context: &Context)
+	pub fn event(&mut self, event: &Event)
+	{
+		self.player_cam.event(event);
+	}
+
+	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, window: &glfw::Window, context: &Context)
 	{
 		use num::traits::One;
 
-		let light_direction = Vec3::new(0.0f32, -1.0f32, 0.0f32);
+		// XXX these should be constants
+		let pass_cfg_shadow = ShaderCacheQuery {
+				keywords: Keywords::empty(),
+				pass: StdPass::Shadow,
+				default_draw_state: DrawState::default(),
+				sampler_block_base: 0,
+				uniform_block_base: 2
+		};
+
+		let pass_cfg_forward = ShaderCacheQuery {
+				keywords: POINT_LIGHT | SHADOWS_SIMPLE,
+				pass: StdPass::ForwardBase,
+				default_draw_state: DrawState::default(),
+				sampler_block_base: 0,
+				uniform_block_base: 2
+		};
+
+		// TODO use another camera if there is no terrain
+		let cam = self.player_cam.get_camera(&self.terrain.as_ref().unwrap(), window);
+
+		// TODO do not assume that the first light source is directional
+		let light_direction = if let LightSource::Directional(dir, _, _) = self.light_sources[0] {
+			dir
+		} else {
+			Vec3::new(0.0f32, -1.0f32, 0.0f32)
+		};
+
+		let (light_color, light_intensity) = match self.light_sources[0] {
+			LightSource::Directional(_, color, intensity) => (color, intensity),
+			LightSource::Point(_, color, intensity) => (color, intensity)
+		};
+
 		// light matrix setup
+		// TODO compute bounding box of view frustum?
+		// TODO cascaded shadow maps
 		let depth_proj_matrix = OrthoMat3::<f32>::new(20.0, 20.0, -10.0, 10.0);
 		let mut depth_view_matrix = Iso3::<f32>::one();
 		depth_view_matrix.look_at_z(
-			&Pnt3::new(1.0, 1.0, 0.0),
 			&Pnt3::new(0.0, 0.0, 0.0),
+			&(Pnt3::new(0.0, 0.0, 0.0) + light_direction),
 			&Vec3::new(0.0, 0.0, -1.0));
 		depth_view_matrix.inv_mut();
 
@@ -201,7 +307,27 @@ impl<'a> Scene<'a>
 			shadow_frame.clear(None, Some(1.0));
 			for ent in self.entities.iter()
 			{
-				graphics.draw_mesh_shadow(&ent.mesh, &light_data, &ent.transform.to_mat4(), &shadow_frame);
+				#[repr(C)]
+				#[derive(Copy, Clone)]
+				struct LightParams
+				{
+					light_matrix: Mat4<f32>,
+					model_matrix: Mat4<f32>
+				}
+
+				let model_data = shadow_frame.make_uniform_buffer(&ent.transform.to_mat4());
+
+				let light_params = shadow_frame.make_uniform_buffer(&LightParams {
+					light_matrix: light_data.light_matrix,
+					model_matrix: ent.transform.to_mat4()
+					});
+
+				graphics.draw_mesh_with_shader(
+					&ent.mesh,
+					&self.shader_cache.get(&ent.material.shader, &pass_cfg_shadow).program,
+					&[Binding{slot:0, slice: light_params.as_raw()},
+					  Binding{slot:1, slice: model_data.as_raw()}],
+					&shadow_frame);
 			}
 		}
 
@@ -230,12 +356,16 @@ impl<'a> Scene<'a>
 					view_mat: cam.view_matrix,
 					proj_mat: cam.proj_matrix,
 					view_proj_mat: cam.proj_matrix * cam.view_matrix,
-					light_dir: Vec4::new(1.0,1.0,0.0,0.0),
+					light_dir: Vec4::new(
+						light_direction.x,
+						light_direction.y,
+						light_direction.z,
+						0.0),
 					w_eye: Vec4::new(0.0,0.0,0.0,0.0),
 					viewport_size: Vec2::new(rt_dim.0 as f32, rt_dim.1 as f32),
-					light_pos: self.light_sources[0].position,
-					light_color: self.light_sources[0].color,
-					light_intensity: self.light_sources[0].intensity
+					light_pos: light_direction,
+					light_color: light_color,
+					light_intensity: light_intensity
 				};
 				let buf = frame.make_uniform_buffer(&data);
 				SceneData {
@@ -262,7 +392,8 @@ impl<'a> Scene<'a>
 				let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
 				ent.material.bind();
 				self.shadow_map.bind(1);
-				graphics.draw_mesh_with_shader(&ent.mesh, &self.shadow_prog,
+				graphics.draw_mesh_with_shader(&ent.mesh,
+					&self.shader_cache.get(&ent.material.shader, &pass_cfg_forward).program,
 					&[Binding {slot:0, slice: scene_data.buffer},
 					  Binding {slot:1, slice:model_data.as_raw()},
 					  Binding {slot:2, slice:light_data.as_raw()}], &frame);

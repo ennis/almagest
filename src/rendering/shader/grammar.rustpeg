@@ -1,0 +1,89 @@
+use super::{
+  ShConfigKw,
+  ShTextureAddressMode,
+  ShTextureFilter,
+  ShShaderItem,
+  ShUniform,
+  ShSampler,
+  ShPass};
+use rendering::sampler::*;
+use std::path::PathBuf;
+
+#[pub]
+word -> &'input str
+  = [a-zA-Z0-9_]+ { match_str }
+
+#[pub]
+config_kw -> ShConfigKw<'input>
+  = a:"!"? b:word { match a {
+      Some(_) => ShConfigKw::Without(b),
+      None => ShConfigKw::With(b)
+    }
+  }
+
+ws = [ \t\n\r]
+__ = ws+
+skipws = ws*
+
+number -> u32 = [0-9]+ {? match_str.parse::<u32>().map_err(|_|{"Error parsing u32"}) }
+
+address_mode -> TextureAddressMode =
+    ("repeat" { TextureAddressMode::Wrap })
+  / ("clamp" { TextureAddressMode::Clamp })
+  / ("mirror" { TextureAddressMode::Mirror })
+
+sampler_decl -> ShShaderItem<'input>
+  = "sampler"
+    __ name:word
+    __ addr_u:address_mode
+    __ addr_v:address_mode
+    __ min_filter:("nearest" { TextureMinFilter::Nearest } / "linear" { TextureMinFilter::Linear } )
+    __ mag_filter:("nearest" { TextureMagFilter::Nearest } / "linear" { TextureMagFilter::Linear } )
+    {
+      ShShaderItem::Sampler(Box::new(
+        ShSampler {
+          name: name,
+          desc: Sampler2DDesc {
+              addr_u: addr_u,
+              addr_v: addr_v,
+              min_filter: min_filter,
+              mag_filter: mag_filter
+          }
+        }
+      ))
+    }
+
+
+#[pub]
+pass -> ShShaderItem<'input>
+    = "pass" ws* name:word ws* "{" ws* "}"
+    {
+        ShShaderItem::Pass(Box::new(ShPass {name: name}))
+    }
+
+#[pub]
+uniform_decl -> ShShaderItem<'input>
+    = "uniform" __ name:word __ ty:word
+    {
+        ShShaderItem::Uniform(Box::new(ShUniform {name: name, ty: ty}))
+    }
+
+#[pub]
+shader_item -> ShShaderItem<'input>
+    = pass / sampler_decl / uniform_decl
+
+#[pub]
+shader_source -> (Vec<ShShaderItem<'input>>, &'input str)
+  = "shader" ws* "{" ws* items:shader_item* ws* "}" ws* "!!GLSL" ws* rest:(.* {match_str})
+  {
+      (items, rest)
+  }
+
+eol = [\n\r]
+
+//
+// #pragma include line parser
+#[pub]
+pragma_include -> PathBuf
+    = "#" ws* "pragma" __ "include" __ "<" path:((!">" .)+ {match_str}) ">" ws*
+    {PathBuf::from(path)}
