@@ -7,6 +7,9 @@ use std::cell::RefCell;
 use std::io::Write;
 use super::{Shader, UniformType};
 use super::gl_program::*;
+use rendering::attrib::*;
+use gl;
+use gl::types::*;
 
 pub struct ShaderCache;
 
@@ -70,13 +73,13 @@ fn compile_program(shader: &Shader, config: Keywords, query: &ShaderCacheQuery) 
 	}
     // make the material block
     if !shader.uniforms.is_empty() {
-        writeln!(out, r"layout(std140, binding = {}) uniform MaterialBlock {{", query.uniform_block_base);
+        writeln!(out, r"layout(std140, binding = {}) uniform MaterialBlock {{", query.uniform_block_base).unwrap();
         for u in shader.uniforms.iter() {
-            writeln!(out, "{} {};", shader_type_to_glsl(u.ty), u.name);
+            writeln!(out, "{} {};", shader_type_to_glsl(u.ty), u.name).unwrap();
         }
-        writeln!(out, "}};");
+        writeln!(out, "}};").unwrap();
     }
-    writeln!(out, "{}", &shader.glsl_source[..]);
+    writeln!(out, "{}", &shader.glsl_source[..]).unwrap();
 
 	let mut out_vs = Vec::<u8>::new();
 	writeln!(out_vs, "#version {}", shader.glsl_version).unwrap();

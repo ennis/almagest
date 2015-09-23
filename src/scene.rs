@@ -324,7 +324,8 @@ impl<'a> Scene<'a>
 
 				graphics.draw_mesh_with_shader(
 					&ent.mesh,
-					&self.shader_cache.get(&ent.material.shader, &pass_cfg_shadow).program,
+					&ent.material.shader,
+					&self.shader_cache.get(&ent.material.shader, &pass_cfg_shadow),
 					&[Binding{slot:0, slice: light_params.as_raw()},
 					  Binding{slot:1, slice: model_data.as_raw()}],
 					&shadow_frame);
@@ -393,7 +394,8 @@ impl<'a> Scene<'a>
 				ent.material.bind();
 				self.shadow_map.bind(1);
 				graphics.draw_mesh_with_shader(&ent.mesh,
-					&self.shader_cache.get(&ent.material.shader, &pass_cfg_forward).program,
+					&ent.material.shader,
+					&self.shader_cache.get(&ent.material.shader, &pass_cfg_forward),
 					&[Binding {slot:0, slice: scene_data.buffer},
 					  Binding {slot:1, slice:model_data.as_raw()},
 					  Binding {slot:2, slice:light_data.as_raw()}], &frame);

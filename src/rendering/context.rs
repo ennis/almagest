@@ -17,6 +17,40 @@ pub struct Context
 	// TODO ref to window
 }
 
+// Views: persistent or scoped?
+// Persistent: like D3D, create the view object only once (borrowing the texture, but not mutably)
+// *** Scoped: the view object is created only when it is needed, and dropped when it is not needed anymore.
+//     for render targets, this allows the object to 'lock' the underlying texture for writing, preventing
+//     it to be bound as a texture at the same time (undefined behavior in OpenGL)
+
+/*pub enum RenderTargetView<'a>
+{
+	// TODO: texture layers, buffers
+	Texture2D(&'a mut Texture2D),
+	Screen,
+	None,
+}
+
+pub enum DepthStencilView<'a>
+{
+	Texture2D(&'a mut Texture2D),
+	Screen,
+	None,
+}
+
+pub struct CommandList<'a>
+{
+	context: &'a Context
+}
+
+impl<'a> CommandList<'a>
+{
+	pub fn alloc_transient_buffer()
+	{
+		unimplemented!()
+	}
+}*/
+
 extern "system" fn debug_callback(
 	source: GLenum,
 	ty: GLenum,
@@ -28,7 +62,7 @@ extern "system" fn debug_callback(
 {
 	unsafe {
 		let msg_str = CStr::from_ptr(msg);
-		//println!("{}", msg_str.to_str().unwrap());
+		trace!("{}", msg_str.to_str().unwrap());
 	}
 }
 

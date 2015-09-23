@@ -1,4 +1,7 @@
-shader {}
+shader {
+	glsl_layout float3:0,float3:0,float3:0,float2:0
+}
+
 !!GLSL
 #version 440
 #pragma include <scene.glsl>

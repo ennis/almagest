@@ -11,6 +11,7 @@ use shadow_pass::*;
 use image::{self, GenericImage};
 use asset_loader::*;
 use rendering::shader::*;
+use std::rc::Rc;
 
 pub struct Rect
 {
@@ -160,13 +161,11 @@ pub struct Graphics<'a>
 	// Default sampler
 	default_sampler: Sampler2D,
 
-    // Vertex layouts
-    mesh_layout: InputLayout,
-    blit_layout: InputLayout,
     // Shared programs
-    blit_program: GLProgram,
-    default_mesh_program: GLProgram,
-
+    blit_shader: Shader,
+    default_shader: Shader,
+	blit_pso: Rc<PipelineState>,
+	default_pso: Rc<PipelineState>,
     // default (missing) texture (material)
     missing_tex: Texture2D
 }
@@ -184,24 +183,28 @@ impl<'a> Graphics<'a>
     pub fn new(context: &'a Context) -> Graphics<'a>
     {
         //...
+		let mut shader_cache = ShaderCache::new();
+
+		let pso_desc = ShaderCacheQuery {
+			keywords: Keywords::empty(),
+			pass: StdPass::ForwardBase,
+			default_draw_state: DrawState::default(),
+			sampler_block_base: 0,
+			uniform_block_base: 0
+		};
+
+		let blit_shader = Shader::load(Path::new("assets/shaders/blit.glsl"));
+		let mesh_shader = Shader::load(Path::new("assets/shaders/default.glsl"));
+		let blit_pso = shader_cache.get(&blit_shader, &pso_desc);
+		let mesh_pso = shader_cache.get(&mesh_shader, &pso_desc);
+
         Graphics {
             context: context,
             // blitter
-            blit_program: GLProgram::from_source(
-					&load_shader_source(Path::new("assets/shaders/blit.vs")),
-					&load_shader_source(Path::new("assets/shaders/blit.fs"))).expect("Error creating program"),
-			blit_layout: InputLayout::new(1, &[
-				Attribute { slot:0, ty: AttributeType::Float2 },
-				Attribute { slot:0, ty: AttributeType::Float2 }] ),
-            // Meshes
-            mesh_layout: InputLayout::new(1, &[
-				Attribute{ slot: 0, ty: AttributeType::Float3 },
-				Attribute{ slot: 0, ty: AttributeType::Float3 },
-				Attribute{ slot: 0, ty: AttributeType::Float3 },
-				Attribute{ slot: 0, ty: AttributeType::Float2 }]),
-			default_mesh_program: GLProgram::from_source(
-				&load_shader_source(Path::new("assets/shaders/default.vs")),
-				&load_shader_source(Path::new("assets/shaders/default.fs"))).expect("Error creating program"),
+			blit_shader: blit_shader,
+			default_shader: mesh_shader,
+			blit_pso: blit_pso,
+			default_pso: mesh_pso,
             missing_tex: load_texture2d_from_file(Path::new("assets/img/missing_512.png")),
 			default_sampler: Sampler2DDesc::default().build()
         }
@@ -221,15 +224,14 @@ impl<'a> Graphics<'a>
     }
 
 	/// Draw a mesh with the specified shader and parameters
-	pub fn draw_mesh_with_shader(&self, mesh: &Mesh, prog: &GLProgram, bindings: &[Binding], frame: &Frame)
+	pub fn draw_mesh_with_shader(&self, mesh: &Mesh, shader: &Shader, pipeline_state: &PipelineState, bindings: &[Binding], frame: &Frame)
 	{
 		frame.draw(
 			mesh.vb.raw.as_raw_buf_slice(),
 			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
-			&DrawState::default(),
-			&self.mesh_layout,
+			&shader,
+			&pipeline_state,
 			mesh.parts[0],
-			prog,
 			bindings,
 			&[]);
 	}
@@ -273,8 +275,8 @@ impl<'a> Graphics<'a>
         frame.draw(
             buf.as_raw(),
             None,
-            &DrawState::default(),
-            &self.blit_layout,
+            &self.blit_shader,
+			&self.blit_pso,
             MeshPart {
                 primitive_type: PrimitiveType::Triangle,
                 start_vertex: 0,
@@ -282,7 +284,6 @@ impl<'a> Graphics<'a>
                 num_vertices: 6,
                 num_indices: 0
                 },
-            &self.blit_program,
             &[Binding {slot:0, slice: buf_2.as_raw() }],
             &[TextureBinding {slot: 0, sampler: &self.default_sampler, texture: &texture}]
             );

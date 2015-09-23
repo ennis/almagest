@@ -260,3 +260,13 @@ impl InputLayout
 		}
 	}
 }
+
+impl Drop for InputLayout
+{
+    fn drop(&mut self)
+    {
+        unsafe {
+            gl::DeleteVertexArrays(1, &mut self.vao);
+        }
+    }
+}

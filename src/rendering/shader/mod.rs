@@ -5,6 +5,7 @@ mod cache;
 
 use rendering::frame::*;
 use rendering::sampler::*;
+use rendering::attrib::*;
 pub use self::keywords::*;
 pub use self::gl_program::*;
 pub use self::cache::*;
@@ -87,6 +88,13 @@ pub struct PipelineState
     pub draw_state: DrawState
 }
 
+struct GLSLInput
+{
+    slot: u32,
+    shader_type: UniformType,
+    attrib_type: AttributeType
+}
+
 /// Parsed shader
 pub struct Shader
 {
@@ -102,6 +110,10 @@ pub struct Shader
     /// GLSL version of the shader
     /// Must be reinserted with #version ___
     glsl_version: u32,
+    /// Input layout (unpacked shader type, raw type in buffer, buffer slot)
+    glsl_input_layout: Vec<GLSLInput>,
+    /// VAO, made from the previous input layout
+    pub layout: InputLayout,
     /// Cached result of shader resolution
 	forward_pass_unlit_prog: RefCell<Option<Rc<PipelineState>>>,
     /// Cached result of shader resolution
@@ -122,20 +134,7 @@ impl Shader
 {
     pub fn load(source_path: &Path) -> Shader
     {
-        let (u, s, p, glsl_source, glsl_version) = parse_shader(source_path);
-        Shader {
-            samplers: s,
-            uniforms: u,
-            passes: p,
-            glsl_source: glsl_source,
-            glsl_version: glsl_version.unwrap_or(110),
-            forward_pass_unlit_prog: RefCell::new(None),
-            forward_pass_point_light_prog: RefCell::new(None),
-            forward_pass_spot_light_prog: RefCell::new(None),
-            forward_pass_directional_light_prog: RefCell::new(None),
-            deferred_pass_prog: RefCell::new(None),
-            shadow_pass_prog: RefCell::new(None),
-            cache: RefCell::new(HashMap::new())
-        }
+        trace!("Loading shader {:?}", source_path);
+        parse_shader(source_path)
     }
 }

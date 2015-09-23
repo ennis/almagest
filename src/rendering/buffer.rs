@@ -257,7 +257,7 @@ impl BufferAllocator
             let map_flags = get_gl_access_flags(access) | gl::MAP_PERSISTENT_BIT |
                             gl::MAP_COHERENT_BIT | gl::MAP_INVALIDATE_BUFFER_BIT/* |
 				gl::MAP_UNSYNCHRONIZED_BIT*/;
-            let storage_flags = get_gl_storage_flags(access, usage) /*|
+            let storage_flags = get_gl_storage_flags(access, usage) | gl::MAP_PERSISTENT_BIT;/*|
 				gl::MAP_PERSISTENT_BIT |
 				gl::MAP_COHERENT_BIT*/;
             gl::GenBuffers(1, &mut obj);

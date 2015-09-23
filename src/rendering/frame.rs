@@ -7,9 +7,9 @@ use rendering::buffer::{RawBuffer, BufSlice, RawBufSlice, BufferAccess,
 use typed_arena::{Arena};
 use std::cell::RefCell;
 use rendering::attrib::*;
-use rendering::shader::{GLProgram};
 use rendering::texture::Texture2D;
 use rendering::sampler::Sampler2D;
+use rendering::shader::*;
 
 #[derive(Copy, Clone, Debug)]
 pub enum CullMode
@@ -178,17 +178,18 @@ pub struct MeshPart
 pub fn draw_instanced(
 		vertex_buffer: RawBufSlice,
 		index_buffer: Option<RawBufSlice>,
-		layout: &InputLayout,
 		part: MeshPart,
-		prog: &GLProgram,
+		shader: &Shader,
+		pipeline_state: &PipelineState,
 		uniform_buffers: &[Binding],
 		textures: &[TextureBinding])
 {
+	pipeline_state.draw_state.sync_state();
 	unsafe
 	{
-		gl::UseProgram(prog.obj);
+		gl::UseProgram(pipeline_state.program.obj);
 		super::buffer::bind_uniform_buffers(uniform_buffers);
-		super::buffer::bind_vertex_buffers(layout, &[vertex_buffer]);
+		super::buffer::bind_vertex_buffers(&shader.layout, &[vertex_buffer]);
 
 		for t in textures.iter() {
 			t.texture.bind(t.slot as u32);
@@ -394,10 +395,9 @@ impl<'a> Frame<'a>
 		&self,
 		vertex_buffer: RawBufSlice,
 		index_buffer: Option<RawBufSlice>,
-		draw_state: &DrawState,
-		layout: &InputLayout,
+		shader: &Shader,
+		pipeline_state: &PipelineState,
 		mesh_part: MeshPart,
-		prog: &GLProgram,
 		uniform_buffers: &[Binding],
 		textures: &[TextureBinding])
 	{
@@ -405,8 +405,7 @@ impl<'a> Frame<'a>
 		unsafe {
 			gl::BindFramebuffer(gl::FRAMEBUFFER, self.framebuffer);
 		}
-		draw_state.sync_state();
-		draw_instanced(vertex_buffer, index_buffer, layout, mesh_part, prog, uniform_buffers, textures);
+		draw_instanced(vertex_buffer, index_buffer, mesh_part, shader, pipeline_state, uniform_buffers, textures);
 	}
 }
 

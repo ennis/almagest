@@ -25,8 +25,8 @@ pub struct Terrain<'a>
 
 pub struct TerrainRenderer
 {
-    prog: GLProgram,
-    layout: InputLayout
+    shader: Shader,
+    pipeline_state: Rc<PipelineState>
 }
 
 #[derive(Copy, Clone)]
@@ -101,11 +101,19 @@ impl TerrainRenderer
 {
     pub fn new() -> TerrainRenderer
     {
+        let pso_desc = ShaderCacheQuery {
+            keywords: Keywords::empty(),
+            pass: StdPass::ForwardBase,
+            default_draw_state: DrawState::default(),
+            sampler_block_base: 0,
+            uniform_block_base: 0
+        };
+        let mut shader_cache = ShaderCache::new();
+        let shader = Shader::load(Path::new("assets/shaders/terrain.vs"));
+        let pso = shader_cache.get(&shader, &pso_desc);
         TerrainRenderer {
-			layout: InputLayout::new(1, &[Attribute{ slot: 0, ty: AttributeType::Float2 }]),
-			prog: GLProgram::from_source(
-				&load_shader_source(Path::new("assets/shaders/terrain.vs")),
-				&load_shader_source(Path::new("assets/shaders/terrain.fs"))).expect("Error creating program")
+			shader: shader,
+            pipeline_state: pso
 		}
     }
 
@@ -120,8 +128,8 @@ impl TerrainRenderer
 		frame.draw(
 			terrain.vertex_buffer.raw.as_raw_buf_slice(),
 			None,
-			&DrawState::default(),
-			&self.layout,
+            &self.shader,
+            &self.pipeline_state,
 			MeshPart {
                 primitive_type: PrimitiveType::Triangle,
                 start_vertex: 0,
@@ -129,7 +137,6 @@ impl TerrainRenderer
                 num_vertices: 6*terrain.heightmap_tex.dimensions().0*terrain.heightmap_tex.dimensions().1,
                 num_indices: 0
             },
-			&self.prog,
 			&[
 				Binding{slot:0, slice: scene_data.buffer},
                 Binding{slot:1, slice: terrain_params.as_raw()}],

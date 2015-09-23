@@ -68,9 +68,18 @@ uniform_decl -> ShShaderItem<'input>
         ShShaderItem::Uniform(Box::new(ShUniform {name: name, ty: ty}))
     }
 
+layout_entry -> (&'input str, u32)
+  = ty:word ":" slot:number { (ty, slot) }
+
+#[pub]
+layout_decl -> ShShaderItem<'input>
+  = "glsl_layout" __ entries:(layout_entry ** ",") {
+    ShShaderItem::Layout(Box::new(entries))
+  }
+
 #[pub]
 shader_item -> ShShaderItem<'input>
-    = pass / sampler_decl / uniform_decl
+    = pass / sampler_decl / uniform_decl / layout_decl
 
 #[pub]
 shader_source -> (Vec<ShShaderItem<'input>>, &'input str)

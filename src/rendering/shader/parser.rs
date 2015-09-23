@@ -7,7 +7,9 @@ use std::cell::{RefCell};
 use std::str;
 use rendering::frame::DrawState;
 use std::collections::HashMap;
-use super::{Uniform, Pass, Sampler, UniformType};
+use super::{Uniform, Pass, Sampler, UniformType, GLSLInput};
+use rendering::attrib::*;
+use super::Shader;
 
 //==========================================================
 // Shader syntax
@@ -34,7 +36,8 @@ pub enum ShShaderItem<'a>
 {
     Sampler(Box<ShSampler<'a>>),
     Uniform(Box<ShUniform<'a>>),
-    Pass(Box<ShPass<'a>>)
+    Pass(Box<ShPass<'a>>),
+    Layout(Box<Vec<(&'a str, u32)>>)
 }
 
 pub struct ShSampler<'a>
@@ -70,7 +73,14 @@ fn test_sh_grammar_file()
     Shader::load(Path::new("assets/shaders/example.glsl"));
 }
 
-pub fn parse_shader(source_path: &Path) -> (Vec<Uniform>, Vec<Sampler>, Vec<Pass>, String, Option<u32>)
+fn build_vao(inputs: &[GLSLInput]) -> InputLayout
+{
+    let attribs = inputs.iter().map(|i| Attribute { slot: i.slot, ty: i.attrib_type }).collect::<Vec<_>>();
+    let layout = InputLayout::new(1, &attribs[..]);
+    layout
+}
+
+pub fn parse_shader(source_path: &Path) -> Shader
 {
     use std::io::{stderr, stdout};
     use combine::*;
@@ -89,6 +99,7 @@ pub fn parse_shader(source_path: &Path) -> (Vec<Uniform>, Vec<Sampler>, Vec<Pass
     let mut samplers = Vec::new();
     let mut uniforms = Vec::new();
     let mut passes = Vec::new();
+    let mut inputs = Vec::new();
 
     // process configs
     for item in items
@@ -101,18 +112,34 @@ pub fn parse_shader(source_path: &Path) -> (Vec<Uniform>, Vec<Sampler>, Vec<Pass
                 ty: UniformType::from_str(u.ty).expect("Unrecognized uniform type")}),
             ShShaderItem::Pass(p) => passes.push( Pass {
                 name: p.name.to_string()
-            })
+            }),
+            ShShaderItem::Layout(glsl_inputs) => {
+                if !inputs.is_empty() {
+                    panic!("Duplicate glsl_input directive");
+                }
+                for &(tyname, slot) in glsl_inputs.iter()
+                {
+                    let (shader_ty, attr_ty) = parse_input_type(tyname);
+                    inputs.push( GLSLInput {
+                        slot: slot,
+                        shader_type: shader_ty,
+                        attrib_type: attr_ty
+                    });
+                }
+            }
         }
     }
 
-    (uniforms, samplers, passes, glsl_pp, glsl_version)
+    let vao = build_vao(&inputs[..]);
 
-    /*PShader {
+    Shader {
         samplers: samplers,
         uniforms: uniforms,
         passes: passes,
         glsl_source: glsl_pp,
         glsl_version: glsl_version.unwrap_or(110),
+        glsl_input_layout: inputs,
+        layout: vao,
         forward_pass_unlit_prog: RefCell::new(None),
         forward_pass_point_light_prog: RefCell::new(None),
         forward_pass_spot_light_prog: RefCell::new(None),
@@ -120,7 +147,7 @@ pub fn parse_shader(source_path: &Path) -> (Vec<Uniform>, Vec<Sampler>, Vec<Pass
         deferred_pass_prog: RefCell::new(None),
         shadow_pass_prog: RefCell::new(None),
         cache: RefCell::new(HashMap::new())
-    }*/
+    }
 }
 
 //==========================================================
@@ -133,6 +160,17 @@ struct ShIncludeFile<'a>
 	parent_file: Option<&'a ShIncludeFile<'a>>
 }
 
+fn parse_input_type(ty: &str) -> (UniformType, AttributeType)
+{
+    match ty
+    {
+        "float" => (UniformType::Float, AttributeType::Float),
+        "float2" => (UniformType::Float2, AttributeType::Float2),
+        "float3" => (UniformType::Float3, AttributeType::Float3),
+        "float4" => (UniformType::Float4, AttributeType::Float4),
+        _ => panic!("Invalid input type {}", ty)
+    }
+}
 
 fn process_includes<W: Write>(
     input: &str,
