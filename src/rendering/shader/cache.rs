@@ -1,6 +1,6 @@
 use super::parser::*;
 use super::keywords::*;
-use super::PipelineState;
+use super::{PipelineState, PipelineStateDesc};
 use rendering::frame::*;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -13,19 +13,6 @@ use gl::types::*;
 
 pub struct ShaderCache;
 
-
-
-pub struct ShaderCacheQuery
-{
-    pub keywords: Keywords,
-    pub pass: StdPass,
-    // NOTE: this does not participate in shader resolution
-    pub default_draw_state: DrawState,
-    // NOTE: this does not participate in shader resolution
-    pub sampler_block_base: u32,
-    // NOTE: this does not participate in shader resolution
-    pub uniform_block_base: u32
-}
 
 macro_rules! keyword_impl { ($y:expr, $kw:expr, $x:ident) => { if $y.contains($x) { $kw.push( stringify!($x) ) }; } }
 
@@ -64,7 +51,7 @@ fn shader_type_to_glsl(ty: UniformType) -> &'static str
 }
 
 
-fn compile_program(shader: &Shader, config: Keywords, query: &ShaderCacheQuery) -> GLProgram
+pub fn compile_program(shader: &Shader, config: Keywords, query: &PipelineStateDesc) -> GLProgram
 {
     let keywords = variant_bits_to_keywords(config);
     let mut out = Vec::<u8>::new();
@@ -97,6 +84,14 @@ fn compile_program(shader: &Shader, config: Keywords, query: &ShaderCacheQuery) 
     GLProgram::from_source(&vs[..], &fs[..]).unwrap()
 }
 
+pub fn compile_pipeline_state(shader: &Shader, config: Keywords, query: &PipelineStateDesc) -> PipelineState
+{
+    PipelineState {
+        draw_state: query.default_draw_state,
+        config: config,
+        program: compile_program(shader, config, query)}
+}
+
 impl ShaderCache
 {
     pub fn new() -> ShaderCache
@@ -104,14 +99,10 @@ impl ShaderCache
         ShaderCache
     }
 
-    fn load_variant(&mut self, shader: &Shader, config: Keywords, query: &ShaderCacheQuery) -> Rc<PipelineState>
+    fn load_variant(&mut self, shader: &Shader, config: Keywords, query: &PipelineStateDesc) -> Rc<PipelineState>
 	{
 		shader.cache.borrow_mut().entry(config)
-				.or_insert_with(|| Rc::new(
-					PipelineState {
-                        draw_state: query.default_draw_state,
-						config: config,
-						program: compile_program(shader, config, query)})).clone()
+				.or_insert_with(|| Rc::new(compile_pipeline_state(shader, config, query))).clone()
 	}
 
     // helper method
@@ -120,7 +111,7 @@ impl ShaderCache
         shader: &Shader,
         variant: &RefCell<Option<Rc<PipelineState>>>,
         config: Keywords,
-        query: &ShaderCacheQuery) -> Rc<PipelineState>
+        query: &PipelineStateDesc) -> Rc<PipelineState>
     {
         if let Some(ref variant) = *(variant.borrow())
         {
@@ -135,7 +126,7 @@ impl ShaderCache
         result
     }
 
-    pub fn get(&mut self, shader: &Shader, query: &ShaderCacheQuery) -> Rc<PipelineState>
+    pub fn get(&mut self, shader: &Shader, query: &PipelineStateDesc) -> Rc<PipelineState>
     {
         // Add pass specific keyword
         let config = query.keywords | match query.pass {

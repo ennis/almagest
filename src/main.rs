@@ -6,6 +6,7 @@
 #![plugin(serde_macros)]
 #![plugin(peg_syntax_ext)]
 #![allow(dead_code, unused_imports, unused_variables, non_camel_case_types)]
+#![feature(const_fn)]
 
 extern crate nalgebra;
 extern crate glfw;

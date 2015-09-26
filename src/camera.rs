@@ -8,7 +8,8 @@ use num::traits::{Zero, One};
 pub struct Camera
 {
 	pub view_matrix: Mat4<f32>,
-	pub proj_matrix: Mat4<f32>
+	pub proj_matrix: Mat4<f32>,
+	pub w_eye: Pnt3<f32>
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -210,7 +211,8 @@ impl TrackballCameraController
 			view_matrix: self.get_look_at().prepend_translation(&self.v_eye).to_homogeneous(),
 			proj_matrix: PerspMat3::new(
 				aspect_ratio as f32, self.settings.field_of_view as f32,
-				self.settings.near_plane as f32, self.settings.far_plane as f32).to_mat()
+				self.settings.near_plane as f32, self.settings.far_plane as f32).to_mat(),
+			w_eye: Pnt3::new(0.0f32, 0.0f32, 0.0f32) + self.v_eye	// XXX this is wrong
 		}
 	}
 }

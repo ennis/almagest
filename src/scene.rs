@@ -121,6 +121,19 @@ pub enum LightSource
 	Point(Vec3<f32>, Vec3<f32>, f32)
 }
 
+struct SkyDomeVertex
+{
+	pos: Vec3<f32>
+}
+
+struct Sky<'a>
+{
+	dome_mesh: Mesh<'a>,
+	shader: Shader,
+	pso: PipelineState,
+	nightsky: Texture2D
+}
+
 pub struct Scene<'a>
 {
 	entities: Vec<Entity<'a>>,
@@ -131,6 +144,28 @@ pub struct Scene<'a>
 	//
 	shader_cache: ShaderCache,
 	player_cam: PlayerCamera,
+	sky: Sky<'a>
+}
+
+fn make_scale_matrix(scale: f32) -> Mat4<f32>
+{
+	Mat4::new(
+		scale, 0.0, 0.0, 1.0,
+		0.0, scale, 0.0, 1.0,
+		0.0, 0.0, scale, 1.0,
+		0.0, 0.0, 0.0, 1.0
+		)
+}
+
+#[derive(Copy,Clone)]
+#[repr(C)]
+struct SkyParams
+{
+	modelMatrix: Mat4<f32>,
+	rayleighCoefficient: f32,
+	mieCoefficient: f32,
+	mieDirectionalG: f32,
+	turbidity: f32
 }
 
 impl<'a> Scene<'a>
@@ -146,6 +181,22 @@ impl<'a> Scene<'a>
 		// load JSON repr
 		let scene_json : JsonSceneFile = serde_json::de::from_reader(reader).unwrap();
 		//trace!("{:?}", scene_json);
+
+		let sky_dome = Mesh::load_from_obj(context, &asset_root.join("models/dome.obj"));
+		let nightsky = {
+			let img = image::open(&asset_root.join("img/skymap.tif")).unwrap();
+			let (dimx, dimy) = img.dimensions();
+			let img2 = img.as_rgb8().unwrap();
+			Texture2D::with_pixels(dimx, dimy, 1, TextureFormat::Unorm8x3, Some(img2))
+		};
+		let sky_shader = Shader::load(&asset_root.join("shaders/sky.glsl"));
+		let sky_pso = sky_shader.make_pipeline_state(&PipelineStateDesc {
+            keywords: Keywords::empty(),
+            pass: StdPass::ForwardBase,
+            default_draw_state: DrawState::default(),
+            sampler_block_base: 0,
+            uniform_block_base: 0
+        });
 
 		// load all meshes and materials
 		let mut entities = Vec::<Entity>::new();
@@ -227,6 +278,12 @@ impl<'a> Scene<'a>
 		let terrain = scene_json.terrain.map(|t| Terrain::new(context, &asset_root.join(&t.heightmap), t.scale, t.height_scale));
 
 		Scene {
+			sky: Sky {
+				dome_mesh: sky_dome,
+				nightsky: nightsky,
+				shader: sky_shader,
+				pso: sky_pso
+			},
 			entities: entities,
 			light_sources: light_sources,
 			terrain: terrain,
@@ -252,7 +309,7 @@ impl<'a> Scene<'a>
 		use num::traits::One;
 
 		// XXX these should be constants
-		let pass_cfg_shadow = ShaderCacheQuery {
+		let pass_cfg_shadow = PipelineStateDesc {
 				keywords: Keywords::empty(),
 				pass: StdPass::Shadow,
 				default_draw_state: DrawState::default(),
@@ -260,7 +317,7 @@ impl<'a> Scene<'a>
 				uniform_block_base: 2
 		};
 
-		let pass_cfg_forward = ShaderCacheQuery {
+		let pass_cfg_forward = PipelineStateDesc {
 				keywords: POINT_LIGHT | SHADOWS_SIMPLE,
 				pass: StdPass::ForwardBase,
 				default_draw_state: DrawState::default(),
@@ -349,6 +406,8 @@ impl<'a> Scene<'a>
 				bias * light_data.light_matrix
 			};
 
+
+
 			// test blit
 			//graphics.blit(graphics.default_texture(), &Rect::from_dimensions(0.0, 0.0, 511.0, 511.0), &frame);
 
@@ -359,10 +418,10 @@ impl<'a> Scene<'a>
 					view_proj_mat: cam.proj_matrix * cam.view_matrix,
 					light_dir: Vec4::new(
 						light_direction.x,
-						light_direction.y,
+						-light_direction.y,
 						light_direction.z,
 						0.0),
-					w_eye: Vec4::new(0.0,0.0,0.0,0.0),
+					w_eye: Vec4::new(cam.w_eye.x,cam.w_eye.y,cam.w_eye.z,1.0),
 					viewport_size: Vec2::new(rt_dim.0 as f32, rt_dim.1 as f32),
 					light_pos: light_direction,
 					light_color: light_color,
@@ -383,11 +442,38 @@ impl<'a> Scene<'a>
 				&Rect { top: 0.0, bottom: 300.0, left: 0.0, right: 300.0 },
 				&frame);
 
+			//================================================
+			// TERRAIN
 			if let Some(ref terrain) = self.terrain
 			{
 				terrain_renderer.render_terrain(&terrain, &scene_data, &frame);
 			}
 
+			//================================================
+			// SKY
+			{
+				let model_data = frame.make_uniform_buffer(
+					&SkyParams {
+						modelMatrix: make_scale_matrix(100.0),
+						rayleighCoefficient: 0.0,	// unused
+						mieCoefficient: 0.005,
+						mieDirectionalG: 0.80,
+						turbidity: 2.0
+					});
+
+				self.sky.nightsky.bind(0);	// TODO fix this hack
+				graphics.draw_mesh_with_shader(
+					&self.sky.dome_mesh,
+					&self.sky.shader,
+					&self.sky.pso,
+					&[Binding {slot:0, slice:scene_data.buffer},
+					  Binding {slot:1, slice:model_data.as_raw()},
+					  Binding {slot:2, slice:light_data.as_raw()}],
+					&frame);
+			}
+
+			//================================================
+			// SCENE
 			for ent in self.entities.iter()
 			{
 				let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
@@ -396,7 +482,7 @@ impl<'a> Scene<'a>
 				graphics.draw_mesh_with_shader(&ent.mesh,
 					&ent.material.shader,
 					&self.shader_cache.get(&ent.material.shader, &pass_cfg_forward),
-					&[Binding {slot:0, slice: scene_data.buffer},
+					&[Binding {slot:0, slice:scene_data.buffer},
 					  Binding {slot:1, slice:model_data.as_raw()},
 					  Binding {slot:2, slice:light_data.as_raw()}], &frame);
 			}

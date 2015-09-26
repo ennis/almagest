@@ -62,7 +62,7 @@ extern "system" fn debug_callback(
 {
 	unsafe {
 		let msg_str = CStr::from_ptr(msg);
-		trace!("{}", msg_str.to_str().unwrap());
+		//trace!("{}", msg_str.to_str().unwrap());
 	}
 }
 

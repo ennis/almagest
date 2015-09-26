@@ -26,7 +26,7 @@ pub struct Terrain<'a>
 pub struct TerrainRenderer
 {
     shader: Shader,
-    pipeline_state: Rc<PipelineState>
+    pipeline_state: PipelineState
 }
 
 #[derive(Copy, Clone)]
@@ -101,16 +101,15 @@ impl TerrainRenderer
 {
     pub fn new() -> TerrainRenderer
     {
-        let pso_desc = ShaderCacheQuery {
+        let pso_desc = PipelineStateDesc {
             keywords: Keywords::empty(),
             pass: StdPass::ForwardBase,
             default_draw_state: DrawState::default(),
             sampler_block_base: 0,
             uniform_block_base: 0
         };
-        let mut shader_cache = ShaderCache::new();
-        let shader = Shader::load(Path::new("assets/shaders/terrain.vs"));
-        let pso = shader_cache.get(&shader, &pso_desc);
+        let shader = Shader::load(Path::new("assets/shaders/terrain.glsl"));
+        let pso = shader.make_pipeline_state(&pso_desc);
         TerrainRenderer {
 			shader: shader,
             pipeline_state: pso

@@ -106,7 +106,8 @@ impl PlayerCamera
 			view_matrix: look_at.to_homogeneous(),
 			proj_matrix: PerspMat3::new(
 				aspect_ratio as f32, self.settings.field_of_view as f32,
-				self.settings.near_plane as f32, self.settings.far_plane as f32).to_mat()
+				self.settings.near_plane as f32, self.settings.far_plane as f32).to_mat(),
+            w_eye: eye_pos
 		}
 	}
 }

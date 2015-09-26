@@ -185,7 +185,7 @@ impl<'a> Graphics<'a>
         //...
 		let mut shader_cache = ShaderCache::new();
 
-		let pso_desc = ShaderCacheQuery {
+		let pso_desc = PipelineStateDesc {
 			keywords: Keywords::empty(),
 			pass: StdPass::ForwardBase,
 			default_draw_state: DrawState::default(),
@@ -193,10 +193,18 @@ impl<'a> Graphics<'a>
 			uniform_block_base: 0
 		};
 
+		let wire_pso_desc = PipelineStateDesc {
+			keywords: Keywords::empty(),
+			pass: StdPass::ForwardBase,
+			default_draw_state: DrawState { polygon_fill_mode: PolygonFillMode::Wireframe, .. DrawState::default() },
+			sampler_block_base: 0,
+			uniform_block_base: 0
+		};
+
 		let blit_shader = Shader::load(Path::new("assets/shaders/blit.glsl"));
-		let mesh_shader = Shader::load(Path::new("assets/shaders/default.glsl"));
+		let mesh_shader = Shader::load(Path::new("assets/shaders/debug.glsl"));
 		let blit_pso = shader_cache.get(&blit_shader, &pso_desc);
-		let mesh_pso = shader_cache.get(&mesh_shader, &pso_desc);
+		let mesh_pso = shader_cache.get(&mesh_shader, &wire_pso_desc);
 
         Graphics {
             context: context,
@@ -237,9 +245,16 @@ impl<'a> Graphics<'a>
 	}
 
     /// Draw a mesh in wireframe
-    pub fn draw_wire_mesh(&self, frame: &Frame)
+    pub fn draw_wire_mesh(&self, mesh: &Mesh, bindings: &[Binding], frame: &Frame)
     {
-        // TODO
+		frame.draw(
+			mesh.vb.raw.as_raw_buf_slice(),
+			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
+			&self.default_shader,
+			&self.default_pso,
+			mesh.parts[0],
+			bindings,
+			&[]);
     }
 
     /// Blit a texture in the frame

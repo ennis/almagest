@@ -3,7 +3,7 @@ layout (std140, binding = 0) uniform SceneData {
 	mat4 viewMatrix;
 	mat4 projMatrix;
 	mat4 viewProjMatrix;	// = projMatrix*viewMatrix
-	vec4 lightDir;
+	vec4 sunDir;
 	vec4 wEye;	// in world space
 	vec2 viewportSize;	// taille de la fenêtre
 	vec3 wLightPos;
@@ -39,15 +39,15 @@ vec4 wPosToClipSpace(vec4 pos)
 // Do not compile illum functions when rendering a shadow map
 #ifndef SHADOW_MAP
 vec4 PhongIllum(
-	vec4 albedo, 
-	vec3 normal, 
+	vec4 albedo,
+	vec3 normal,
 	vec3 lightDir,
 	vec3 position,
 	float ka,
 	float ks,
-	float kd, 
-	vec3 lightIntensity, 
-	float eta, 
+	float kd,
+	vec3 lightIntensity,
+	float eta,
 	float shininess)
 {
 	vec4 Ln = normalize(vec4(lightDir, 0.0)),
@@ -68,4 +68,3 @@ vec4 PhongIllum(
 	//return vec4(position, 1.0f);
 }
 #endif
-

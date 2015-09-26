@@ -77,12 +77,12 @@ pub enum BlendFactor
 #[derive(Copy, Clone, Debug)]
 pub struct DrawState
 {
-	cull_mode: CullMode,
-	polygon_fill_mode: PolygonFillMode,
-	depth_clip_enable: bool,
+	pub cull_mode: CullMode,
+	pub polygon_fill_mode: PolygonFillMode,
+	pub depth_clip_enable: bool,
 	// depth-stencil state
-	depth_test_enable: bool,
-	depth_write_enable: bool
+	pub depth_test_enable: bool,
+	pub depth_write_enable: bool
 }
 
 pub struct TextureBinding<'a>
@@ -94,7 +94,7 @@ pub struct TextureBinding<'a>
 
 impl DrawState
 {
-	pub fn default() -> DrawState
+	pub const fn default() -> DrawState
 	{
 		DrawState {
 			cull_mode: CullMode::None,
@@ -138,7 +138,6 @@ impl DrawState
 			}
 			// TODO specify this
 			gl::Disable(gl::STENCIL_TEST);
-			gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
 			gl::DepthFunc(gl::LEQUAL);
 		}
 	}

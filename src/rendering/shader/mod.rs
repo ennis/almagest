@@ -95,6 +95,16 @@ struct GLSLInput
     attrib_type: AttributeType
 }
 
+pub struct PipelineStateDesc
+{
+    // TODO: split draw states
+    pub keywords: Keywords,
+    pub pass: StdPass,
+    pub default_draw_state: DrawState,
+    pub sampler_block_base: u32,
+    pub uniform_block_base: u32
+}
+
 /// Parsed shader
 pub struct Shader
 {
@@ -114,6 +124,10 @@ pub struct Shader
     glsl_input_layout: Vec<GLSLInput>,
     /// VAO, made from the previous input layout
     pub layout: InputLayout,
+
+    //--------------------------------------
+    // This should be somewhere else
+
     /// Cached result of shader resolution
 	forward_pass_unlit_prog: RefCell<Option<Rc<PipelineState>>>,
     /// Cached result of shader resolution
@@ -136,5 +150,10 @@ impl Shader
     {
         trace!("Loading shader {:?}", source_path);
         parse_shader(source_path)
+    }
+
+    pub fn make_pipeline_state(&self, desc: &PipelineStateDesc) -> PipelineState
+    {
+        compile_pipeline_state(self, desc.keywords, desc)
     }
 }
