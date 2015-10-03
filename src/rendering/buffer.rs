@@ -58,8 +58,7 @@ pub struct Binding<'a> {
 }
 
 #[derive(Debug)]
-pub struct RawBuffer<'a> {
-    context: &'a BufferAllocator,
+pub struct RawBuffer {
     access: BufferAccess,
     // XXX should only be public for the GL backend
     obj: GLuint,
@@ -67,13 +66,13 @@ pub struct RawBuffer<'a> {
     map_ptr: *mut c_void,
 }
 
-impl<'a> RawBuffer<'a>
+impl RawBuffer
 {
     pub fn as_raw_buf_slice(&self) -> RawBufSlice {
         RawBufSlice { raw: self, offset: 0, size: self.size }
     }
 
-    pub unsafe fn as_buf_slice<T>(&'a self, offset: usize, num_elements: usize) -> BufSlice<'a, T> {
+    pub unsafe fn as_buf_slice<'a, T>(&'a self, offset: usize, num_elements: usize) -> BufSlice<'a, T> {
 		// TODO check alignment of offset?
 		// TODO check that offset + num_elements * mem::size_of::<T> < self.size
 		// but since it's unsafe, might as well skip the checks
@@ -93,14 +92,14 @@ impl<'a> RawBuffer<'a>
 }
 
 // type-safe wrapper around a buffer object
-pub struct Buffer<'a, T> {
-    pub raw: RawBuffer<'a>,
+pub struct Buffer<T> {
+    pub raw: RawBuffer,
     _r: PhantomData<T>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct RawBufSlice<'a> {
-    pub raw: &'a RawBuffer<'a>,
+    pub raw: &'a RawBuffer,
     pub offset: usize,
     pub size: usize,
 }
@@ -108,7 +107,7 @@ pub struct RawBufSlice<'a> {
 // buffer slices
 #[derive(Copy, Clone, Debug)]
 pub struct BufSlice<'a, T> {
-    pub raw: &'a RawBuffer<'a>,
+    pub raw: &'a RawBuffer,
     pub offset: usize,
     pub size: usize,
     _r: PhantomData<T>,
@@ -144,11 +143,7 @@ impl<'a, T> BufSlice<'a, T>
     }
 }
 
-#[derive(Debug)]
-pub struct BufferAllocator;
-
-
-impl<'a, T> Buffer<'a, T>
+impl<T> Buffer<T>
 {
 	// TODO check access flags
     fn get_read_mapping(&self) -> &[T] {
@@ -175,7 +170,7 @@ impl<'a, T> Buffer<'a, T>
     }
 }
 
-impl<'a> Drop for RawBuffer<'a>
+impl Drop for RawBuffer
 {
     fn drop(&mut self) {
         unsafe {
@@ -238,68 +233,64 @@ fn get_gl_binding(binding: BufferBindingHint) -> u32 {
 	}
 }
 
-impl BufferAllocator
-{
-    pub fn alloc_raw_buffer<'a>(&'a self,
-                                byte_size: usize,
-                                access: BufferAccess,
-                                binding: BufferBindingHint,
-                                usage: BufferUsage,
-                                initial_data: Option<&[u8]>)
-                                -> RawBuffer<'a> {
-        let mut obj: GLuint = 0;
-        let ptr: *mut c_void;
-        if let Some(d) = initial_data {
-            assert!(byte_size == d.len());
-        }
-        unsafe {
-            let binding_gl = get_gl_binding(binding);
-            let map_flags = get_gl_access_flags(access) | gl::MAP_PERSISTENT_BIT |
-                            gl::MAP_COHERENT_BIT | gl::MAP_INVALIDATE_BUFFER_BIT/* |
-				gl::MAP_UNSYNCHRONIZED_BIT*/;
-            let storage_flags = get_gl_storage_flags(access, usage) | gl::MAP_PERSISTENT_BIT;/*|
-				gl::MAP_PERSISTENT_BIT |
-				gl::MAP_COHERENT_BIT*/;
-            gl::GenBuffers(1, &mut obj);
-            gl::BindBuffer(binding_gl, obj);
-            gl::BufferStorage(binding_gl,
-                              byte_size as i64,
-                              if let Some(d) = initial_data {
-                    d.as_ptr() as *const GLvoid
-                } else {
-                    0 as *const GLvoid
-                },
-                              storage_flags);
-            ptr = gl::MapBufferRange(
-				binding_gl,
-				0, byte_size as i64,
-				map_flags);
-        }
-        RawBuffer {
-            context: self,
-            access: BufferAccess::ReadWrite,
-            obj: obj,
-            size: byte_size,
-            map_ptr: ptr,
-        }
-    }
 
-    pub fn alloc_buffer<'a, T>(&'a self,
-                               num_elements: usize,
-                               access: BufferAccess,
-                               binding: BufferBindingHint,
-                               usage: BufferUsage,
-                               initial_data: Option<&[T]>)
-                               -> Buffer<'a, T> {
-        let byte_size = mem::size_of::<T>() * num_elements;
-        Buffer {
-            raw: self.alloc_raw_buffer(byte_size, access, binding, usage,
-				if let Some(slice) = initial_data { Some(as_byte_slice(slice)) } else { None }),
-            _r: PhantomData,
-        }
+pub fn alloc_raw_buffer(byte_size: usize,
+                        access: BufferAccess,
+                        binding: BufferBindingHint,
+                        usage: BufferUsage,
+                        initial_data: Option<&[u8]>)
+                        -> RawBuffer {
+    let mut obj: GLuint = 0;
+    let ptr: *mut c_void;
+    if let Some(d) = initial_data {
+        assert!(byte_size == d.len());
     }
-
+    unsafe {
+        let binding_gl = get_gl_binding(binding);
+        let map_flags = get_gl_access_flags(access) | gl::MAP_PERSISTENT_BIT |
+                        gl::MAP_COHERENT_BIT | gl::MAP_INVALIDATE_BUFFER_BIT/* |
+			gl::MAP_UNSYNCHRONIZED_BIT*/;
+        let storage_flags = get_gl_storage_flags(access, usage) | gl::MAP_PERSISTENT_BIT;/*|
+			gl::MAP_PERSISTENT_BIT |
+			gl::MAP_COHERENT_BIT*/;
+        gl::GenBuffers(1, &mut obj);
+        gl::BindBuffer(binding_gl, obj);
+        gl::BufferStorage(binding_gl,
+                          byte_size as i64,
+                          if let Some(d) = initial_data {
+                d.as_ptr() as *const GLvoid
+            } else {
+                0 as *const GLvoid
+            },
+                          storage_flags);
+        ptr = gl::MapBufferRange(
+			binding_gl,
+			0, byte_size as i64,
+			map_flags);
+    }
+    RawBuffer {
+        access: BufferAccess::ReadWrite,
+        obj: obj,
+        size: byte_size,
+        map_ptr: ptr,
+    }
 }
+
+pub fn alloc_buffer<T>(num_elements: usize,
+                       access: BufferAccess,
+                       binding: BufferBindingHint,
+                       usage: BufferUsage,
+                       initial_data: Option<&[T]>)
+                       -> Buffer<T>
+{
+    let byte_size = mem::size_of::<T>() * num_elements;
+    Buffer {
+        raw: alloc_raw_buffer(byte_size, access, binding, usage,
+			if let Some(slice) = initial_data { Some(as_byte_slice(slice)) } else { None }),
+        _r: PhantomData,
+    }
+}
+
 
 pub fn bind_vertex_buffers(layout: &InputLayout, vertex_buffers: &[RawBufSlice]) {
     unsafe {

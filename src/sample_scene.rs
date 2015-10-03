@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use image;
 use image::GenericImage;
 use event;
-use event::{Event};
+use event::{Event, Input};
 use camera::*;
 use window::*;
 use scene::*;
@@ -135,6 +135,7 @@ pub fn sample_scene()
 	glfw.window_hint(glfw::WindowHint::Samples(4));
 
 	let mut win = WindowSettings::new("ALMAGEST", (1024, 768)).build(&glfw).expect("Failed to create GLFW window.");
+	let mut input = Input::new();
 
 	// default sampler
 	unsafe {
@@ -150,7 +151,7 @@ pub fn sample_scene()
 		//tex.bind(0);
 	}
 
-	let ctx = rd::Context::new();
+	let mut ctx = rd::Context::new();
 
 	let (mesh2_vertex, mesh2_indices) = make_circle(1.0f32, 400);
 	let mesh2 = Mesh::new(
@@ -178,15 +179,22 @@ pub fn sample_scene()
 		&Path::new("assets"),
 		&Path::new("assets/scenes/scene.json"));
 
+	let mut tcur = 0.0f64;
+	let mut tlast =  time::precise_time_s();
 	win.event_loop(&mut glfw, |event, window| {
+		tcur = time::precise_time_s();
+		let dt = tcur - tlast;
+		tlast = tcur;
 
 		ctx.event(&event);
+		input.event(&event);
 		camera_controller.event(&event);
 		scene.event(&event);
+		scene.update(dt, &input);
 
 		match event {
 			Event::Render(dt) => {
-				scene.render(&graphics, &terrain_renderer, &window, &ctx);
+				scene.render(&graphics, &terrain_renderer, window, &ctx);
 			},
 
 			_ => {}

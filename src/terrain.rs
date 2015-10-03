@@ -14,11 +14,11 @@ struct TerrainVertex
     pos: Vec2<f32>
 }
 
-pub struct Terrain<'a>
+pub struct Terrain
 {
     heightmap_tex: Texture2D,
     heightmap_img: GrayImage,
-    vertex_buffer: Buffer<'a, TerrainVertex>,
+    vertex_buffer: Buffer<TerrainVertex>,
     scale: f32,
     height_scale: f32
 }
@@ -36,7 +36,7 @@ struct TerrainShaderParams
     height_scale: f32
 }
 
-impl<'a> Terrain<'a>
+impl Terrain
 {
     pub fn sample_height(&self, x: f64, y: f64) -> f64
     {
@@ -47,7 +47,7 @@ impl<'a> Terrain<'a>
             clamp(((y / self.scale as f64) * (h as f64)) as u32, 0, h-1 )).channels()[0] as f64) / (std::u8::MAX as f64) * (self.height_scale as f64)
     }
 
-    pub fn new<'b>(context: &'b Context, heightmap: &Path, scale: f32, height_scale: f32) -> Terrain<'b> {
+    pub fn new(context: &Context, heightmap: &Path, scale: f32, height_scale: f32) -> Terrain {
         // create a 2D grid of vertices
         let img = image::open(heightmap).unwrap();
         let (dimx, dimy) = img.dimensions();
@@ -127,7 +127,6 @@ impl TerrainRenderer
 		frame.draw(
 			terrain.vertex_buffer.raw.as_raw_buf_slice(),
 			None,
-            &self.shader,
             &self.pipeline_state,
 			MeshPart {
                 primitive_type: PrimitiveType::Triangle,

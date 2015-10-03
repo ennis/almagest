@@ -5,6 +5,7 @@ use glfw;
 use camera::*;
 use std;
 use num::traits::{One};
+use window::*;
 
 
 // TODO deduplicate, this is pretty much the same as TrackballCameraSettings
@@ -54,27 +55,8 @@ impl PlayerCamera
     // TODO view bobbing, frame event
     pub fn event(&mut self, event: &Event)
     {
-        // handle mouse move and WASD keys
-        // TODO should not move faster on sloped terrain
-        let w_eye_dir = get_eye_dir(self.view_theta, self.view_phi);
-        // dummy look at without the height
-        let look_at = Rot3::look_at_z(&w_eye_dir, &Vec3::new(0.0f32, 1.0f32, 0.0f32));
-        // TODO should not move faster on sloped terrain
-        let w_strafe_right = look_at.rotate(&Vec3::new(1.0f32, 0.0f32, 0.0f32));
-        let front = Vec2::new(w_eye_dir.x, w_eye_dir.z).normalize();
-        let right = Vec2::new(w_strafe_right.x, w_strafe_right.z).normalize();
-        let speed = 0.1f32;
 
         match event {
-            &Event::KeyDown(k) => {
-                match k {
-                    glfw::Key::W => self.pos = self.pos + front * speed,
-                    glfw::Key::S => self.pos = self.pos - front * speed,
-                    glfw::Key::A => self.pos = self.pos + right * speed,
-                    glfw::Key::D => self.pos = self.pos - right * speed,
-                    _ => {}
-                }
-            },
             &Event::MouseMove(raw_dx, raw_dy) => {
 				let dx = self.settings.sensitivity * raw_dx;
 				let dy = self.settings.sensitivity * raw_dy;
@@ -87,9 +69,29 @@ impl PlayerCamera
         }
     }
 
-    pub fn get_camera(&self, terrain: &Terrain, window: &glfw::Window) -> Camera
+    /// Called once per frame
+    pub fn update(&mut self, dt: f64, input: &Input)
+    {
+        // handle WASD keys
+        let w_eye_dir = get_eye_dir(self.view_theta, self.view_phi);
+        // dummy look at without the height
+        let look_at = Rot3::look_at_z(&w_eye_dir, &Vec3::new(0.0f32, 1.0f32, 0.0f32));
+        // TODO should not move faster on sloped terrain
+        let w_strafe_right = look_at.rotate(&Vec3::new(1.0f32, 0.0f32, 0.0f32));
+        let front = Vec2::new(w_eye_dir.x, w_eye_dir.z).normalize();
+        let right = Vec2::new(w_strafe_right.x, w_strafe_right.z).normalize();
+        let speed = 1.0f32; // one meter per second
+
+        let dt0 = dt as f32;
+        if input.get_key(KeyCode::W) {self.pos = self.pos + front * speed * dt0};
+        if input.get_key(KeyCode::S) {self.pos = self.pos - front * speed * dt0};
+        if input.get_key(KeyCode::A) {self.pos = self.pos + right * speed * dt0};
+        if input.get_key(KeyCode::D) {self.pos = self.pos - right * speed * dt0};
+    }
+
+    pub fn get_camera(&self, terrain: &Terrain, window: &Window) -> Camera
 	{
-		let (width, height) = window.get_size();
+		let (width, height) = window.dimensions();
 		let aspect_ratio = if height != 0 { width as f64 / height as f64 } else { 1.0 };
 
         // TODO add terrain height

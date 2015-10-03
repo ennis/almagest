@@ -1,11 +1,11 @@
 use super::parser::*;
 use super::keywords::*;
 use super::{PipelineState, PipelineStateDesc};
-use rendering::frame::*;
+use rendering::context::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::Write;
-use super::{Shader, UniformType};
+use super::{Shader, UniformType, GLSLInput};
 use super::gl_program::*;
 use rendering::attrib::*;
 use gl;
@@ -84,12 +84,20 @@ pub fn compile_program(shader: &Shader, config: Keywords, query: &PipelineStateD
     GLProgram::from_source(&vs[..], &fs[..]).unwrap()
 }
 
+fn build_vao(inputs: &[GLSLInput]) -> InputLayout
+{
+    let attribs = inputs.iter().map(|i| Attribute { slot: i.slot, ty: i.attrib_type }).collect::<Vec<_>>();
+    let layout = InputLayout::new(1, &attribs[..]);
+    layout
+}
+
 pub fn compile_pipeline_state(shader: &Shader, config: Keywords, query: &PipelineStateDesc) -> PipelineState
 {
     PipelineState {
         draw_state: query.default_draw_state,
         config: config,
-        program: compile_program(shader, config, query)}
+        program: compile_program(shader, config, query),
+		layout: build_vao(&shader.glsl_input_layout[..])}
 }
 
 impl ShaderCache

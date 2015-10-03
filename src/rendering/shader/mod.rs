@@ -3,7 +3,7 @@ mod keywords;
 mod gl_program;
 mod cache;
 
-use rendering::frame::*;
+use rendering::context::*;
 use rendering::sampler::*;
 use rendering::attrib::*;
 pub use self::keywords::*;
@@ -81,11 +81,13 @@ pub struct Sampler
 }
 
 /// Compiled pipeline state
+/// TODO: move this outside the shader subsystem
 pub struct PipelineState
 {
     pub config: Keywords,
     pub program: GLProgram,
-    pub draw_state: DrawState
+    pub draw_state: DrawState,
+    pub layout: InputLayout
 }
 
 struct GLSLInput
@@ -122,8 +124,6 @@ pub struct Shader
     glsl_version: u32,
     /// Input layout (unpacked shader type, raw type in buffer, buffer slot)
     glsl_input_layout: Vec<GLSLInput>,
-    /// VAO, made from the previous input layout
-    pub layout: InputLayout,
 
     //--------------------------------------
     // This should be somewhere else

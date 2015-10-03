@@ -5,7 +5,7 @@ use rendering::sampler::Sampler2DDesc;
 use std::rc::{Rc};
 use std::cell::{RefCell};
 use std::str;
-use rendering::frame::DrawState;
+use rendering::context::DrawState;
 use std::collections::HashMap;
 use super::{Uniform, Pass, Sampler, UniformType, GLSLInput};
 use rendering::attrib::*;
@@ -73,12 +73,6 @@ fn test_sh_grammar_file()
     Shader::load(Path::new("assets/shaders/example.glsl"));
 }
 
-fn build_vao(inputs: &[GLSLInput]) -> InputLayout
-{
-    let attribs = inputs.iter().map(|i| Attribute { slot: i.slot, ty: i.attrib_type }).collect::<Vec<_>>();
-    let layout = InputLayout::new(1, &attribs[..]);
-    layout
-}
 
 pub fn parse_shader(source_path: &Path) -> Shader
 {
@@ -130,8 +124,6 @@ pub fn parse_shader(source_path: &Path) -> Shader
         }
     }
 
-    let vao = build_vao(&inputs[..]);
-
     Shader {
         samplers: samplers,
         uniforms: uniforms,
@@ -139,7 +131,6 @@ pub fn parse_shader(source_path: &Path) -> Shader
         glsl_source: glsl_pp,
         glsl_version: glsl_version.unwrap_or(110),
         glsl_input_layout: inputs,
-        layout: vao,
         forward_pass_unlit_prog: RefCell::new(None),
         forward_pass_point_light_prog: RefCell::new(None),
         forward_pass_spot_light_prog: RefCell::new(None),

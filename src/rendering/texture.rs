@@ -1,6 +1,7 @@
 use gl;
 use gl::types::*;
 use std::mem;
+use rendering::context::*;
 
 #[derive(Copy, Clone, Debug)]
 // Note: same format as vertex attributes, for now
@@ -290,6 +291,23 @@ impl Texture2D
 			gl::BindTextures(unit, 1, &self.obj);
 		}
 	}
+
+    pub fn view(&self) -> TextureView
+    {
+        TextureView { texture: self.obj }
+    }
+
+    pub fn view_as_render_target(&self) -> RenderTargetView
+    {
+        // TODO check that the texture can effectively be used as a render target
+        RenderTargetView { texture: self.obj, viewport: (0, 0, self.width, self.height) }
+    }
+
+    pub fn view_as_depth_stencil_target(&self) -> DepthStencilView
+    {
+        // TODO check that the texture can effectively be used as a depth stencil target
+        DepthStencilView { texture: self.obj, viewport: (0, 0, self.width, self.height) }
+    }
 
 	pub fn width(&self) -> u32 { self.width }
 	pub fn height(&self) -> u32 { self.height }

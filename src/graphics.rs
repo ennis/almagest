@@ -53,21 +53,21 @@ impl MeshVertex
 }
 
 
-pub struct Mesh<'a>
+pub struct Mesh
 {
-	pub vb: Buffer<'a, MeshVertex>,
-	pub ib: Option<Buffer<'a, u16>>,
+	pub vb: Buffer<MeshVertex>,
+	pub ib: Option<Buffer<u16>>,
 	pub parts: Vec<MeshPart>,
 	pub num_vertices: usize,
 	pub num_indices: usize
 }
 
-impl<'a> Mesh<'a>
+impl Mesh
 {
 	/// create a mesh from an OBJ file
 	pub fn load_from_obj(
-		context: &'a Context,
-		path: &Path) -> Mesh<'a>
+		context: &Context,
+		path: &Path) -> Mesh
 	{
 		let mut vertices = Vec::<MeshVertex>::new();
 		let mut indices = Vec::<u16>::new();
@@ -111,10 +111,10 @@ impl<'a> Mesh<'a>
 	}
 
 	pub fn new(
-		context: &'a Context,
+		context: &Context,
 		primitive_type: PrimitiveType,
 		vertices: &[MeshVertex],
-		indices: Option<&[u16]>) -> Mesh<'a>
+		indices: Option<&[u16]>) -> Mesh
 	{
 		let vb = context.alloc_buffer_from_data(
 			vertices,
@@ -232,12 +232,11 @@ impl<'a> Graphics<'a>
     }
 
 	/// Draw a mesh with the specified shader and parameters
-	pub fn draw_mesh_with_shader(&self, mesh: &Mesh, shader: &Shader, pipeline_state: &PipelineState, bindings: &[Binding], frame: &Frame)
+	pub fn draw_mesh_with_shader(&self, mesh: &Mesh, pipeline_state: &PipelineState, bindings: &[Binding], frame: &Frame)
 	{
 		frame.draw(
 			mesh.vb.raw.as_raw_buf_slice(),
 			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
-			&shader,
 			&pipeline_state,
 			mesh.parts[0],
 			bindings,
@@ -250,7 +249,6 @@ impl<'a> Graphics<'a>
 		frame.draw(
 			mesh.vb.raw.as_raw_buf_slice(),
 			mesh.ib.as_ref().map(|ib| ib.raw.as_raw_buf_slice()),
-			&self.default_shader,
 			&self.default_pso,
 			mesh.parts[0],
 			bindings,
@@ -290,7 +288,6 @@ impl<'a> Graphics<'a>
         frame.draw(
             buf.as_raw(),
             None,
-            &self.blit_shader,
 			&self.blit_pso,
             MeshPart {
                 primitive_type: PrimitiveType::Triangle,

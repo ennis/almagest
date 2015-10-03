@@ -19,6 +19,7 @@ use image::{self, GenericImage};
 use event::*;
 use player::*;
 use glfw;
+use window::*;
 
 //-------------------------------------------
 // JSON scene representation
@@ -106,9 +107,9 @@ impl MyTransform
 	}
 }
 
-pub struct Entity<'a>
+pub struct Entity
 {
-	mesh: Rc<Mesh<'a>>,	// mesh index
+	mesh: Rc<Mesh>,	// mesh index
 	material: Rc<Material>,	// material index
 	transform: MyTransform
 }
@@ -126,25 +127,25 @@ struct SkyDomeVertex
 	pos: Vec3<f32>
 }
 
-struct Sky<'a>
+struct Sky
 {
-	dome_mesh: Mesh<'a>,
+	dome_mesh: Mesh,
 	shader: Shader,
 	pso: PipelineState,
 	nightsky: Texture2D
 }
 
-pub struct Scene<'a>
+pub struct Scene
 {
-	entities: Vec<Entity<'a>>,
+	entities: Vec<Entity>,
 	light_sources: Vec<LightSource>,
-	terrain: Option<Terrain<'a>>,
+	terrain: Option<Terrain>,
 	// Shadow map render target
 	shadow_map: Texture2D,
 	//
 	shader_cache: ShaderCache,
 	player_cam: PlayerCamera,
-	sky: Sky<'a>
+	sky: Sky
 }
 
 fn make_scale_matrix(scale: f32) -> Mat4<f32>
@@ -161,19 +162,19 @@ fn make_scale_matrix(scale: f32) -> Mat4<f32>
 #[repr(C)]
 struct SkyParams
 {
-	modelMatrix: Mat4<f32>,
-	rayleighCoefficient: f32,
-	mieCoefficient: f32,
-	mieDirectionalG: f32,
+	model_matrix: Mat4<f32>,
+	rayleigh_coefficient: f32,
+	mie_coefficient: f32,
+	mie_directional_g: f32,
 	turbidity: f32
 }
 
-impl<'a> Scene<'a>
+impl Scene
 {
 	/// Load a scene from a JSON file
 	/// root: asset folder root
 	/// scene: subpath of scene in asset root
-	pub fn load<'b>(context: &'b Context, asset_root: &Path, scene: &Path) -> Scene<'b>
+	pub fn load(context: &Context, asset_root: &Path, scene: &Path) -> Scene
 	{
 		use std::io::Read;
 		let f = File::open(scene).unwrap();
@@ -203,7 +204,7 @@ impl<'a> Scene<'a>
 		let mut light_sources = Vec::<LightSource>::new();
 
 		let materials = AssetCache::<Material>::new();
-		let meshes = AssetCache::<Mesh<'b>>::new();
+		let meshes = AssetCache::<Mesh>::new();
 		let textures = AssetCache::<Texture2D>::new();
 		let shaders = AssetCache::<Shader>::new();
 
@@ -304,9 +305,16 @@ impl<'a> Scene<'a>
 		self.player_cam.event(event);
 	}
 
-	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, window: &glfw::Window, context: &Context)
+	pub fn update(&mut self, dt: f64, input: &Input)
+	{
+		self.player_cam.update(dt, input);
+	}
+
+	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, window: &Window, context: &Context)
 	{
 		use num::traits::One;
+
+		let (width, height) = window.dimensions();
 
 		// XXX these should be constants
 		let pass_cfg_shadow = PipelineStateDesc {
@@ -358,8 +366,9 @@ impl<'a> Scene<'a>
 
 		{
 			// shadow map: create render target with only one depth map
-			let mut shadow_frame = graphics.context().create_frame(RenderTarget::render_to_texture(
-				(1024, 1024), vec![], Some(&mut self.shadow_map)));
+			let mut shadow_frame = graphics.context().create_frame(
+				&[], Some(self.shadow_map.view_as_depth_stencil_target()));
+
 			//let mut shadow_frame = context.create_frame(RenderTarget::screen((640, 480)));
 			shadow_frame.clear(None, Some(1.0));
 			for ent in self.entities.iter()
@@ -381,7 +390,6 @@ impl<'a> Scene<'a>
 
 				graphics.draw_mesh_with_shader(
 					&ent.mesh,
-					&ent.material.shader,
 					&self.shader_cache.get(&ent.material.shader, &pass_cfg_shadow),
 					&[Binding{slot:0, slice: light_params.as_raw()},
 					  Binding{slot:1, slice: model_data.as_raw()}],
@@ -391,7 +399,7 @@ impl<'a> Scene<'a>
 
 		{
 			// frame for main pass
-			let mut frame = graphics.context().create_frame(RenderTarget::screen((1024, 768)));
+			let mut frame = graphics.context().create_screen_frame(window);
 			frame.clear(Some([0.1, 0.1, 0.2, 1.0]), Some(1.0));
 			let rt_dim = frame.dimensions();
 
@@ -454,17 +462,16 @@ impl<'a> Scene<'a>
 			{
 				let model_data = frame.make_uniform_buffer(
 					&SkyParams {
-						modelMatrix: make_scale_matrix(100.0),
-						rayleighCoefficient: 0.0,	// unused
-						mieCoefficient: 0.005,
-						mieDirectionalG: 0.80,
-						turbidity: 2.0
+						model_matrix: make_scale_matrix(100.0),
+						rayleigh_coefficient: 0.0,	// unused
+						mie_coefficient: 0.005,
+						mie_directional_g: 0.80,
+						turbidity: 5.0
 					});
 
 				self.sky.nightsky.bind(0);	// TODO fix this hack
 				graphics.draw_mesh_with_shader(
 					&self.sky.dome_mesh,
-					&self.sky.shader,
 					&self.sky.pso,
 					&[Binding {slot:0, slice:scene_data.buffer},
 					  Binding {slot:1, slice:model_data.as_raw()},
@@ -479,8 +486,8 @@ impl<'a> Scene<'a>
 				let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
 				ent.material.bind();
 				self.shadow_map.bind(1);
-				graphics.draw_mesh_with_shader(&ent.mesh,
-					&ent.material.shader,
+				graphics.draw_mesh_with_shader(
+					&ent.mesh,
 					&self.shader_cache.get(&ent.material.shader, &pass_cfg_forward),
 					&[Binding {slot:0, slice:scene_data.buffer},
 					  Binding {slot:1, slice:model_data.as_raw()},
