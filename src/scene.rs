@@ -174,7 +174,7 @@ fn make_scale_matrix(scale: f32) -> Mat4<f32>
 
 /// Make a PSO directly from a shader file
 /// Using the default draw states
-pub fn make_pipeline_state(path: &Path, kw: Keywords) -> PipelineState
+pub fn load_pipeline_state(path: &Path, kw: Keywords) -> PipelineState
 {
 	let shader = Shader::load(path);
 	shader.make_pipeline_state(&PipelineStateDesc {
@@ -320,8 +320,8 @@ impl Scene
 			entities: entities,
 			light_sources: light_sources,
 			terrain: terrain,
-			depth_only_pso: make_pipeline_state(&asset_root.join("shaders/render_depth.glsl"), Keywords::empty()),
-			normals_only_pso: make_pipeline_state(&asset_root.join("shaders/render_normals.glsl"), Keywords::empty()),
+			depth_only_pso: load_pipeline_state(&asset_root.join("shaders/render_depth.glsl"), Keywords::empty()),
+			normals_only_pso: load_pipeline_state(&asset_root.join("shaders/render_normals.glsl"), Keywords::empty()),
 			shadow_map: Texture2D::new(1024, 1024, 1, TextureFormat::Depth24),
 			shader_cache: ShaderCache::new(),
 			player_cam: PlayerCamera::new(PlayerCameraSettings
@@ -347,10 +347,10 @@ impl Scene
 		{
 			&Event::KeyDown(glfw::Key::F) => {
 				// cycle display modes
-				self.mode = DISPLAY_MODE_CYCLE[self.mode_index];
 				self.mode_index += 1;
 				self.mode_index %= DISPLAY_MODE_CYCLE.len();
-				println!("{:?}", self.mode);
+				self.mode = DISPLAY_MODE_CYCLE[self.mode_index];
+				println!("DisplayMode: {:?}", self.mode);
 			},
 			_ => {}
 		}
@@ -361,7 +361,7 @@ impl Scene
 		self.player_cam.update(dt, input);
 	}
 
-	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, window: &Window, context: &Context)
+	pub fn render(&mut self, graphics: &Graphics, terrain_renderer: &TerrainRenderer, window: &Window, context: &Context, cam: &Camera)
 	{
 		use num::traits::One;
 
@@ -385,7 +385,7 @@ impl Scene
 		};
 
 		// TODO use another camera if there is no terrain
-		let cam = self.player_cam.get_camera(&self.terrain.as_ref().unwrap(), window);
+		//let cam = self.player_cam.get_camera(&self.terrain.as_ref().unwrap(), window);
 
 		// TODO do not assume that the first light source is directional
 		let light_direction = if let LightSource::Directional(dir, _, _) = self.light_sources[0] {
@@ -492,10 +492,10 @@ impl Scene
 			let light_data = frame.make_uniform_buffer(&depth_matrix);
 
 			// debug shadow map
-			graphics.blit(
+			/*graphics.blit(
 				&self.shadow_map,
 				&Rect { top: 0.0, bottom: 300.0, left: 0.0, right: 300.0 },
-				&frame);
+				&frame);*/
 
 
 			match self.mode 

@@ -192,9 +192,11 @@ pub fn sample_scene()
 		scene.event(&event);
 		scene.update(dt, &input);
 
+		let cam = camera_controller.get_camera(window);
+
 		match event {
 			Event::Render(dt) => {
-				scene.render(&graphics, &terrain_renderer, window, &ctx);
+				scene.render(&graphics, &terrain_renderer, window, &ctx, &cam);
 			},
 
 			_ => {}

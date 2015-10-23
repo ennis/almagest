@@ -3,6 +3,7 @@ use nalgebra::*;
 use glfw;
 use std;
 use num::traits::{Zero, One};
+use window::Window;
 
 #[derive(Copy, Clone)]
 pub struct Camera
@@ -202,9 +203,9 @@ impl TrackballCameraController
 		}
 	}
 
-	pub fn get_camera(&self, window: &glfw::Window) -> Camera
+	pub fn get_camera(&self, window: &Window) -> Camera
 	{
-		let (width, height) = window.get_size();
+		let (width, height) = window.dimensions();
 		let aspect_ratio = if height != 0 { width as f64 / height as f64 } else { 1.0 };
 
 		Camera {
