@@ -23,7 +23,7 @@ peg = "*"
 
 [dependencies.glfw]
 git = "https://github.com/bjz/glfw-rs.git"
-default-features = false
+#default-features = false
 
 [dependencies.gl]
 git = "https://github.com/bjz/gl-rs"

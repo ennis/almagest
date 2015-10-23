@@ -135,6 +135,15 @@ struct Sky
 	nightsky: Texture2D
 }
 
+#[derive(Copy, Clone, Debug)]
+enum DisplayMode 
+{
+	Shade,
+	Shadow,
+	Normals,
+	Depth
+}
+
 pub struct Scene
 {
 	entities: Vec<Entity>,
@@ -144,8 +153,12 @@ pub struct Scene
 	shadow_map: Texture2D,
 	//
 	shader_cache: ShaderCache,
+	depth_only_pso: PipelineState,
+	normals_only_pso: PipelineState,
 	player_cam: PlayerCamera,
-	sky: Sky
+	sky: Sky,
+	mode: DisplayMode,
+	mode_index: usize
 }
 
 fn make_scale_matrix(scale: f32) -> Mat4<f32>
@@ -156,6 +169,21 @@ fn make_scale_matrix(scale: f32) -> Mat4<f32>
 		0.0, 0.0, scale, 1.0,
 		0.0, 0.0, 0.0, 1.0
 		)
+}
+
+
+/// Make a PSO directly from a shader file
+/// Using the default draw states
+pub fn make_pipeline_state(path: &Path, kw: Keywords) -> PipelineState
+{
+	let shader = Shader::load(path);
+	shader.make_pipeline_state(&PipelineStateDesc {
+		keywords: kw,
+        pass: StdPass::ForwardBase,
+        default_draw_state: DrawState::default(),
+        sampler_block_base: 0,
+        uniform_block_base: 0
+	})
 }
 
 #[derive(Copy,Clone)]
@@ -278,6 +306,8 @@ impl Scene
 		// create terrain
 		let terrain = scene_json.terrain.map(|t| Terrain::new(context, &asset_root.join(&t.heightmap), t.scale, t.height_scale));
 
+		// display shaders
+
 		Scene {
 			sky: Sky {
 				dome_mesh: sky_dome,
@@ -285,9 +315,13 @@ impl Scene
 				shader: sky_shader,
 				pso: sky_pso
 			},
+			mode: DisplayMode::Shade,
+			mode_index: 0,
 			entities: entities,
 			light_sources: light_sources,
 			terrain: terrain,
+			depth_only_pso: make_pipeline_state(&asset_root.join("shaders/render_depth.glsl"), Keywords::empty()),
+			normals_only_pso: make_pipeline_state(&asset_root.join("shaders/render_normals.glsl"), Keywords::empty()),
 			shadow_map: Texture2D::new(1024, 1024, 1, TextureFormat::Depth24),
 			shader_cache: ShaderCache::new(),
 			player_cam: PlayerCamera::new(PlayerCameraSettings
@@ -303,6 +337,23 @@ impl Scene
 	pub fn event(&mut self, event: &Event)
 	{
 		self.player_cam.event(event);
+
+		const DISPLAY_MODE_CYCLE : [DisplayMode; 4] = [
+			DisplayMode::Shade, 
+			DisplayMode::Normals, 
+			DisplayMode::Shadow, 
+			DisplayMode::Depth];
+		match event 
+		{
+			&Event::KeyDown(glfw::Key::F) => {
+				// cycle display modes
+				self.mode = DISPLAY_MODE_CYCLE[self.mode_index];
+				self.mode_index += 1;
+				self.mode_index %= DISPLAY_MODE_CYCLE.len();
+				println!("{:?}", self.mode);
+			},
+			_ => {}
+		}
 	}
 
 	pub fn update(&mut self, dt: f64, input: &Input)
@@ -403,6 +454,7 @@ impl Scene
 			frame.clear(Some([0.1, 0.1, 0.2, 1.0]), Some(1.0));
 			let rt_dim = frame.dimensions();
 
+			// For shadows:
 			// depth matrix with bias
 			let depth_matrix = {
 				let bias = Mat4::<f32>::new(
@@ -413,11 +465,6 @@ impl Scene
 					);
 				bias * light_data.light_matrix
 			};
-
-
-
-			// test blit
-			//graphics.blit(graphics.default_texture(), &Rect::from_dimensions(0.0, 0.0, 511.0, 511.0), &frame);
 
 			let scene_data = {
 				let data = SceneContext {
@@ -450,49 +497,105 @@ impl Scene
 				&Rect { top: 0.0, bottom: 300.0, left: 0.0, right: 300.0 },
 				&frame);
 
-			//================================================
-			// TERRAIN
-			if let Some(ref terrain) = self.terrain
+
+			match self.mode 
 			{
-				terrain_renderer.render_terrain(&terrain, &scene_data, &frame);
+				//================================================
+				//
+				// Render the full scene with shading
+				//
+				DisplayMode::Shade => {
+					//================================================
+					// TERRAIN
+					if let Some(ref terrain) = self.terrain
+					{
+						terrain_renderer.render_terrain(&terrain, &scene_data, &frame);
+					}
+
+					//================================================
+					// SKY
+					{
+						let model_data = frame.make_uniform_buffer(
+							&SkyParams {
+								model_matrix: make_scale_matrix(100.0),
+								rayleigh_coefficient: 0.0,	// unused
+								mie_coefficient: 0.005,
+								mie_directional_g: 0.80,
+								turbidity: 5.0
+							});
+
+						self.sky.nightsky.bind(0);	// TODO fix this hack
+						graphics.draw_mesh_with_shader(
+							&self.sky.dome_mesh,
+							&self.sky.pso,
+							&[Binding {slot:0, slice:scene_data.buffer},
+							  Binding {slot:1, slice:model_data.as_raw()},
+							  Binding {slot:2, slice:light_data.as_raw()}],
+							&frame);
+					}
+
+					//================================================
+					// SCENE
+					for ent in self.entities.iter()
+					{
+						let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
+						ent.material.bind();
+						self.shadow_map.bind(1);
+						graphics.draw_mesh_with_shader(
+							&ent.mesh,
+							&self.shader_cache.get(&ent.material.shader, &pass_cfg_forward),
+							&[Binding {slot:0, slice:scene_data.buffer},
+							  Binding {slot:1, slice:model_data.as_raw()},
+							  Binding {slot:2, slice:light_data.as_raw()}], &frame);
+					}
+				},
+
+				//================================================
+				//
+				// Render only scene items, without shadows,
+				// sky and terrain
+				DisplayMode::Normals => {
+					//================================================
+					// SCENE
+					for ent in self.entities.iter()
+					{
+						let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
+						graphics.draw_mesh_with_shader(
+							&ent.mesh,
+							&self.normals_only_pso,
+							&[Binding {slot:0, slice:scene_data.buffer},
+							  Binding {slot:1, slice:model_data.as_raw()}], 
+							&frame);
+					}
+				},
+				//================================================
+				//
+				// Render and show depth
+				//
+				DisplayMode::Depth => {
+					//================================================
+					// SCENE
+					for ent in self.entities.iter()
+					{
+						let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
+						graphics.draw_mesh_with_shader(
+							&ent.mesh,
+							&self.depth_only_pso,
+							&[Binding {slot:0, slice:scene_data.buffer},
+							  Binding {slot:1, slice:model_data.as_raw()}], 
+							&frame);
+					}
+				},
+				//================================================
+				//
+				// Render and show shadow maps
+				//
+				DisplayMode::Shadow => {
+					// unimplemented
+				}
 			}
 
-			//================================================
-			// SKY
-			{
-				let model_data = frame.make_uniform_buffer(
-					&SkyParams {
-						model_matrix: make_scale_matrix(100.0),
-						rayleigh_coefficient: 0.0,	// unused
-						mie_coefficient: 0.005,
-						mie_directional_g: 0.80,
-						turbidity: 5.0
-					});
 
-				self.sky.nightsky.bind(0);	// TODO fix this hack
-				graphics.draw_mesh_with_shader(
-					&self.sky.dome_mesh,
-					&self.sky.pso,
-					&[Binding {slot:0, slice:scene_data.buffer},
-					  Binding {slot:1, slice:model_data.as_raw()},
-					  Binding {slot:2, slice:light_data.as_raw()}],
-					&frame);
-			}
-
-			//================================================
-			// SCENE
-			for ent in self.entities.iter()
-			{
-				let model_data = frame.make_uniform_buffer(&ent.transform.to_mat4());
-				ent.material.bind();
-				self.shadow_map.bind(1);
-				graphics.draw_mesh_with_shader(
-					&ent.mesh,
-					&self.shader_cache.get(&ent.material.shader, &pass_cfg_forward),
-					&[Binding {slot:0, slice:scene_data.buffer},
-					  Binding {slot:1, slice:model_data.as_raw()},
-					  Binding {slot:2, slice:light_data.as_raw()}], &frame);
-			}
 		}
 	}
 }

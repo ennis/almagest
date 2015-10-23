@@ -34,6 +34,16 @@ vec4 wPosToClipSpace(vec4 pos)
 	return lightTransformMatrix * pos;
 	#endif
 }
+
+vec3 wNToCameraSpace(vec3 wN)
+{
+	#ifndef SHADOW_MAP
+	return (viewMatrix * vec4(wN, 0.0)).xyz;
+	#endif
+	#ifdef SHADOW_MAP
+	return (lightTransformMatrix * vec4(wN, 0.0)).xyz;
+	#endif
+}
 #endif
 
 // Do not compile illum functions when rendering a shadow map
